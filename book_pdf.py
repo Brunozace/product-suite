@@ -69,7 +69,7 @@ class Document:
     def flush(self):
         if not self.ops:
             return
-        self.text("PRODUCT SUITE   /   FIELD GUIDE", 19, 8, 1)
+        self.text("DEARWORK   /   FIELD GUIDE", 19, 8, 1)
         self.text(str(len(self.pages) + 1), 19, 8, 1, 384)
         contents = self.stream(b"\n".join(self.ops))
         resources = " ".join(f"/F{i} {ref} 0 R" for i, ref in enumerate(self.fonts))

@@ -212,7 +212,7 @@ function nav() {
           "</div>"
         : ""
     }`;
-  return `<aside class="nav ${navOpen ? "open" : ""}"><div class="brand"><img src="/mark.svg" alt=""><div><strong>Product Suite</strong><small>Make it, sell it, get clients</small></div>${b("×", "menu", "", "mobile quiet")}</div><div class="navscroll">${navTop("home", "Home", "home")}${navTop("unibox", "Unibox", "mail", demo ? '<span class="count">' + unread + "</span>" : "")}${navTop("settings", "Settings", "settings")}<span class="label">Digital product</span><div class="pick">${icon("book")}${select("format", formats, C.f)}</div>${groups.slice(0, 3).map(group).join("")}<span class="label">AI side hustles</span><div class="pick">${icon("layers")}${select("hustle", hustles, C.h)}</div>${groups.slice(3).map(group).join("")}</div><div class="navfoot"><div class="seg">${b("Demo", "mode", "demo", demo ? "sel" : "")}${b("Live", "mode", "live", !demo ? "sel" : "")}</div>${demo ? b("Run live demo", "tour", "", "money", "play") + '<div class="footlinks">' + b("Load all", "loadall", "", "quiet", "layers") + b("Saved", "saved", "", "quiet", "folder") + "</div>" : ""}<div class="costline"><span>${demo ? "Demo, nothing spent" : "Session budget reserved"}</span><b class="mono">$${demo ? "0.00" : Number(live.reserved || 0).toFixed(2)}</b></div></div></aside>`;
+  return `<aside class="nav ${navOpen ? "open" : ""}"><div class="brand"><img src="/mark.svg" alt=""><div><strong>Dearwork</strong><small>Make it, sell it, get clients</small></div>${b("×", "menu", "", "mobile quiet")}</div><div class="navscroll">${navTop("home", "Home", "home")}${navTop("unibox", "Unibox", "mail", demo ? '<span class="count">' + unread + "</span>" : "")}${navTop("settings", "Settings", "settings")}<span class="label">Digital product</span><div class="pick">${icon("book")}${select("format", formats, C.f)}</div>${groups.slice(0, 3).map(group).join("")}<span class="label">AI side hustles</span><div class="pick">${icon("layers")}${select("hustle", hustles, C.h)}</div>${groups.slice(3).map(group).join("")}</div><div class="navfoot"><div class="seg">${b("Demo", "mode", "demo", demo ? "sel" : "")}${b("Live", "mode", "live", !demo ? "sel" : "")}</div>${demo ? b("Run live demo", "tour", "", "money", "play") + '<div class="footlinks">' + b("Load all", "loadall", "", "quiet", "layers") + b("Saved", "saved", "", "quiet", "folder") + "</div>" : ""}<div class="costline"><span>${demo ? "Demo, nothing spent" : "Session budget reserved"}</span><b class="mono">$${demo ? "0.00" : Number(live.reserved || 0).toFixed(2)}</b></div></div></aside>`;
 }
 function rail() {
   let events = demo
@@ -392,7 +392,7 @@ function render() {
   document.querySelector(".navscroll").scrollTop = ns;
   document.title =
     (labels[screen] || screen[0].toUpperCase() + screen.slice(1)) +
-    " | Product Suite";
+    " | Dearwork";
 }
 function confirmBox(title, desc, price, fn) {
   pending = fn;

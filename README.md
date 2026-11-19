@@ -1,10 +1,10 @@
-# Product Suite
+# Dearwork
 
 A local dashboard for building a digital product, finding buyers, running outreach and preparing a launch. Three service workspaces cover Airbnb photo edits, local ad remakes and original YouTube Shorts.
 
 ## Start
 
-On Windows, double-click **Start Product Suite.cmd**. On Windows, macOS or Linux with Python 3.10 or newer, open a terminal in this folder and run:
+On Windows, double-click **Start Dearwork.cmd**. On Windows, macOS or Linux with Python 3.10 or newer, open a terminal in this folder and run:
 
 ```sh
 python app.py
@@ -32,7 +32,7 @@ Switch to **Live**, open **Settings**, and save the keys for the providers you i
 | Market research | Preconfigured public-source research for Reddit, Amazon, Etsy, TikTok and YouTube. Each pay-per-event actor gets a separate hard cap. Independent jobs run concurrently and successful results survive individual failures. Inspect source records before using them. |
 | Products | Use reviewed research to draft the plan. Review or enter an outline and source material, generate units sequentially, edit the saved text and export a PDF. Generation checkpoints each unit. Use linked sources you have actually read. |
 | Discovery and email | Instagram research can chain hashtag reels, public profiles and recent reels. Other platforms use their own searches. The Apify LinkedIn Email Finder accepts public business LinkedIn URLs, skips risky results and records verified addresses for that track. Review identity, fit and business purpose before adding leads. |
-| Domain setup | Check six suggested names, quote a one-year Spaceship registration and submit the selected domain with private registration and auto-renew off. Review a separate ScaledMail subscription per domain. External-domain orders require a registrar login, supplied only in the confirmed order. |
+| Domain setup | Check six branded sending-domain suggestions (Dearwork by default), quote a one-year Spaceship registration and submit the selected domain with private registration and auto-renew off. Review a separate ScaledMail subscription per domain. External-domain orders require a registrar login, supplied only in the confirmed order. |
 | Inbox connection | Inspect provider accounts, submit supplied MX/TXT records, check them at the registrar and transfer Google mailbox credentials from ScaledMail directly to Instantly. The import skips existing inboxes and enables warmup. Some Google accounts require provider-side authorization. |
 | Outreach | Review and edit a first email and optional day-three follow up. Create a paused Instantly campaign, add verified leads, send a single test and activate separately. Activation checks the sending account’s status and warmup age. |
 | Replies | Read the campaign’s received messages and local template drafts. Minute checks are opt-in and run while the app is open. Request a separately quoted AI rewrite when needed. Real messages are available in Instantly. |

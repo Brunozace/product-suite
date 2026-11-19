@@ -338,7 +338,7 @@ export function liveView(C) {
       field(
         "Business name for six suggestions",
         "domain-brand",
-        live.config.business || "",
+        live.config.business || "Dearwork",
       ),
       field(
         "Dedicated domain to check or order",

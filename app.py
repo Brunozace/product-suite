@@ -1,4 +1,4 @@
-"""Product Suite local helper. Start with python app.py."""
+"""Dearwork local helper. Start with python app.py."""
 
 import argparse
 import json
@@ -347,7 +347,7 @@ class LocalServer(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "ProductSuite"
+    server_version = "Dearwork"
 
     def log_message(self, *args):
         pass
@@ -384,7 +384,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.response(403, {"error": "Open the local workspace."})
         p = unquote(urlsplit(self.path).path)
         if p == "/health":
-            return self.response(200, {"ok": True, "application": "Product Suite"})
+            return self.response(200, {"ok": True, "application": "Dearwork"})
         if p == "/api/session":
             return self.response(200, {"token": self.server.workspace.token})
         path = (PUBLIC / (p.lstrip("/") or "index.html")).resolve()
@@ -455,20 +455,20 @@ def main():
         url = f"http://127.0.0.1:{args.port}"
         try:
             with urlopen(url + "/health", timeout=2) as response:
-                existing = json.load(response).get("application") == "Product Suite"
+                existing = json.load(response).get("application") == "Dearwork"
         except Exception:
             existing = False
         if not existing:
             parser.exit(
                 1, f"Port {args.port} is busy. Start with --port {args.port + 1}.\n"
             )
-        print("Product Suite is already running at " + url)
+        print("Dearwork is already running at " + url)
         if not args.no_browser:
             webbrowser.open(url)
         return
     server.workspace = Workspace(args.data_dir)
     url = f"http://127.0.0.1:{server.server_port}"
-    print("Product Suite is running at " + url, flush=True)
+    print("Dearwork is running at " + url, flush=True)
     if not args.no_browser:
         threading.Timer(0.35, webbrowser.open, args=(url,)).start()
     try:
