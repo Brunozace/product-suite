@@ -1,0 +1,9 @@
+{
+  "default": "gpt-5.4-mini",
+  "models": {
+    "gpt-5.4-mini": { "label": "GPT-5.4 mini", "input": 0.75, "output": 4.5 },
+    "gpt-5.4-nano": { "label": "GPT-5.4 nano", "input": 0.2, "output": 1.25 },
+    "gpt-6.2-sol": { "label": "GPT-6.2 Sol", "input": 2.0, "output": 10.0 },
+    "gpt-6.2-astra": { "label": "GPT-6.2 Astra", "input": 8.0, "output": 40.0 }
+  }
+}
