@@ -30,7 +30,6 @@ export const configFields = {
   name: "Your full sender name",
   business: "Business name",
   address: "Business mailing address",
-  creditPrice: "Your AI Ark price per credit ($)",
 };
 const catalog = await fetch("/writing-models.json").then((response) =>
   response.json(),
@@ -119,7 +118,7 @@ export function settingsView(C) {
             l,
             "cfg-" + k,
             live.config[k] ?? { cap: 10, robotCap: 1 }[k] ?? "",
-            ["cap", "robotCap", "creditPrice"].includes(k) ? "number" : "text",
+            ["cap", "robotCap"].includes(k) ? "number" : "text",
           ),
         )
         .join("")}</div>${b("Save settings", "saveconfig")}`,
@@ -285,7 +284,7 @@ export function liveView(C) {
   if (o.includes("verify"))
     forms.push(
       field(
-        "Public business LinkedIn profile URLs, one per line",
+        "Public business LinkedIn profile URLs, one per line (up to 25 new profiles)",
         "lookup",
         "",
         "area",

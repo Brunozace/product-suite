@@ -48,7 +48,6 @@ DEFAULTS = {
     "cap": 10.0,
     "robotCap": 1.0,
     "model": DEFAULT_MODEL,
-    "creditPrice": "",
     "fable": "",
     "company": "",
     "workspace": "",
@@ -67,6 +66,7 @@ class Workspace:
         self.db.setdefault("keys", {})
         self.db.setdefault("tracks", {})
         self.db["config"] = {**DEFAULTS, **self.db.get("config", {})}
+        self.db["config"].pop("creditPrice", None)
         # Retired provider keys stay private and are never reused as OpenAI keys.
         if str(self.db["config"]["model"]).startswith("claude-"):
             self.db["config"]["model"] = DEFAULT_MODEL
@@ -183,8 +183,6 @@ class Workspace:
             for k in ["cap", "robotCap"]:
                 if k in new:
                     new[k] = amount(new[k], 0.01, 10000)
-            if new.get("creditPrice"):
-                new["creditPrice"] = amount(new["creditPrice"], 0.00001)
             if "model" in new:
                 require(
                     new["model"] in (*OPENAI_MODELS, "fable"),

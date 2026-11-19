@@ -28,7 +28,6 @@ HOSTS = {
     "OpenAI": "https://api.openai.com/v1",
     "Apify": "https://api.apify.com/v2",
     "Higgsfield": "https://api.higgsfield.ai",
-    "AI Ark": "https://api.ai-ark.com/api/developer-portal",
     "Instantly": "https://api.instantly.ai/api/v2",
     "Whop": "https://api.whop.com/api/v1",
     "Nano Banana": "https://generativelanguage.googleapis.com/v1beta",
@@ -38,7 +37,6 @@ HOSTS = {
 READS = {
     "OpenAI": "/models",
     "Apify": "/users/me",
-    "AI Ark": "/v1/people/export/submissions?page=0&size=1",
     "Instantly": "/accounts?limit=1",
     "Whop": "/products?first=1",
     "Nano Banana": "/models?pageSize=1",
@@ -47,7 +45,7 @@ READS = {
 }
 PROVIDER = {
     "robot": "Apify",
-    "verify": "AI Ark",
+    "verify": "Apify",
     "write": "OpenAI",
     "media": "Higgsfield",
     "mediaStatus": "Higgsfield",
@@ -124,8 +122,6 @@ def request(keys, name, path, method="GET", body=None, extra=None):
     key = v.get("key", "")
     require(key, "Add your " + name + " key first. It opens below.")
     headers = {"Authorization": "Bearer " + key}
-    if name == "AI Ark":
-        headers = {"X-TOKEN": key}
     if name == "Spaceship":
         headers = {"X-API-Key": key, "X-API-Secret": v["secret"]}
     if name == "Nano Banana":
@@ -219,6 +215,28 @@ def response_input(model, prompt):
     }
 
 
+EMAIL_FINDER = "memo23~linkedin-email-finder"
+
+
+def actor_pricing(keys, actor):
+    infos = request(keys, "Apify", "/acts/" + actor)["data"].get(
+        "pricingInfos", []
+    )
+    current = [
+        x
+        for x in infos
+        if x.get("startedAt", "")
+        <= time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    ]
+    price = max(current, key=lambda x: x.get("startedAt", ""), default={})
+    require(
+        price.get("pricingModel") == "PAY_PER_EVENT"
+        and not price.get("isPricePerEventWithPlatformUsage"),
+        "Choose a pay-per-event actor with platform usage included so the run cap applies.",
+    )
+    return price
+
+
 def quote_job(p, t, cfg, keys):
     op = p["op"]
     provider = PROVIDER[op]
@@ -280,21 +298,7 @@ def quote_job(p, t, cfg, keys):
         actor = p["actor"]
         require(re.fullmatch(r"[\w-]+(?:~[\w-]+)?", actor), "Enter an Apify actor ID.")
         p["input"] = object_input(p["actorInput"])
-        infos = request(keys, provider, "/acts/" + actor)["data"].get(
-            "pricingInfos", []
-        )
-        current = [
-            x
-            for x in infos
-            if x.get("startedAt", "")
-            <= time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        ]
-        price = max(current, key=lambda x: x.get("startedAt", ""), default={})
-        require(
-            price.get("pricingModel") == "PAY_PER_EVENT"
-            and not price.get("isPricePerEventWithPlatformUsage"),
-            "Choose a pay-per-event actor with platform usage included so the run cap applies.",
-        )
+        actor_pricing(keys, actor)
         cost = amount(cfg["robotCap"], 0.01)
         desc += (
             "Run "
@@ -313,13 +317,19 @@ def quote_job(p, t, cfg, keys):
             "Enter up to 30 public business LinkedIn profile URLs, one per line.",
         )
         p["profiles"] = urls
-        cost = amount(cfg.get("creditPrice"), 0.00001) * len(urls)
-        desc += (
-            "Check "
-            + str(len(urls))
-            + " business profiles. Maximum one credit per verified email, using your saved price per credit.\n"
-            + "\n".join(urls)
-        )
+        pending = [url for url in urls if url not in t.get("checks", {})]
+        require(len(pending) <= 25, "Check up to 25 new profiles per run.")
+        if pending:
+            price = actor_pricing(keys, EMAIL_FINDER)
+            events = price.get("pricingPerEvent", {}).get("actorChargeEvents", {})
+            require(set(events) == {"person-email-confirmed"}, "Email finder pricing changed. Review its Apify listing.")
+            rate = amount(events["person-email-confirmed"].get("eventPriceUsd"), 0.00001)
+            cost = round(rate * len(pending), 6)
+            require(cost <= cfg["robotCap"], "Use fewer profiles or raise the cap per robot run.")
+            desc += f"Check {len(pending)} new profiles at up to ${rate:g} per confirmed work email.\n"
+        else:
+            desc += "Show previously checked profiles at no additional charge.\n"
+        desc += "\n".join(urls)
     elif op == "media":
         path = p["modelPath"]
         require(
@@ -437,6 +447,41 @@ def quote_job(p, t, cfg, keys):
     return math.ceil(cost * 10000) / 10000, desc
 
 
+def run_actor(call, actor, payload, cost, track, run_field, persist):
+    ans = call(
+        "/acts/"
+        + actor
+        + "/runs?"
+        + urlencode(
+            {"maxTotalChargeUsd": cost, "waitForFinish": 25, "timeout": 180}
+        ),
+        "POST",
+        payload,
+    )["data"]
+    track[run_field] = ans["id"]
+    persist()
+    for _ in range(40):
+        if ans["status"] not in ("READY", "RUNNING"):
+            break
+        time.sleep(4)
+        ans = call("/actor-runs/" + quote(track[run_field]))["data"]
+    require(
+        ans["status"] == "SUCCEEDED",
+        "Actor "
+        + ans["status"]
+        + ". Check run "
+        + track[run_field]
+        + " before retrying.",
+    )
+    return public_data(
+        call(
+            "/datasets/"
+            + quote(ans["defaultDatasetId"])
+            + "/items?limit=50&clean=true"
+        )
+    )
+
+
 def run_job(p, t, cfg, keys, persist):
     op = p["op"]
     name = PROVIDER[op]
@@ -495,68 +540,47 @@ def run_job(p, t, cfg, keys, persist):
         )
         return result
     if op == "robot":
-        ans = call(
-            "/acts/"
-            + p["actor"]
-            + "/runs?"
-            + urlencode(
-                {"maxTotalChargeUsd": p["cost"], "waitForFinish": 25, "timeout": 180}
-            ),
-            "POST",
-            p["input"],
-        )["data"]
-        t.update(actor=p["actor"], actorInput=p["actorInput"], runId=ans["id"])
-        persist()
-        for _ in range(40):
-            if ans["status"] not in ("READY", "RUNNING"):
-                break
-            time.sleep(4)
-            ans = call("/actor-runs/" + quote(t["runId"]))["data"]
-        require(
-            ans["status"] == "SUCCEEDED",
-            "Actor "
-            + ans["status"]
-            + ". Check run "
-            + t["runId"]
-            + " before retrying.",
-        )
-        return public_data(
-            call(
-                "/datasets/"
-                + quote(ans["defaultDatasetId"])
-                + "/items?limit=50&clean=true"
-            )
-        )
+        t.update(actor=p["actor"], actorInput=p["actorInput"])
+        return run_actor(call, p["actor"], p["input"], p["cost"], t, "runId", persist)
     if op == "verify":
-        out = []
         cache = t.setdefault("checks", {})
-        for url in p["profiles"]:
-            if url in cache:
-                out.append(cache[url])
-                continue
-            try:
-                result = call("/v1/people/export/single", "POST", {"url": url})
-            except ProviderError as err:
-                if err.status != 404:
-                    raise
-                result = {}
-            found = [
-                email(a["address"])
-                for a in result.get("email", {}).get("output", [])
-                if a.get("found")
-                and a.get("status") == "VALID"
-                and a.get("domainType") == "SMTP"
-                and a.get("address")
-            ]
-            t["verified"] = sorted(set(t.get("verified", []) + found))
-            cache[url] = {
-                "verified": found,
-                "source": url,
-                "result": "Verified" if found else "No verified email. Skipped.",
-            }
-            out.append(cache[url])
+        pending = [url for url in p["profiles"] if url not in cache]
+        results = dict(cache)
+        if pending:
+            payload = {"linkedinUrls": pending, "smtpCheck": True}
+            rows = run_actor(call, EMAIL_FINDER, payload, p["cost"], t, "emailRunId", persist)
+            by_slug = {urlsplit(url).path.rstrip("/"): url for url in pending}
+            for row in rows:
+                url = row.get("input")
+                if not url:
+                    profile = urlsplit(row.get("linkedinUrl") or "")
+                    if profile.hostname and re.fullmatch(r"(?:[a-z]{2,3}\.)?linkedin\.com", profile.hostname):
+                        url = by_slug.get(profile.path.rstrip("/"))
+                if url not in pending:
+                    continue
+                found = []
+                if (
+                    row.get("status") == "confirmed"
+                    and row.get("sendDecision") == "send"
+                    and row.get("mailboxConfirmed") is True
+                    and isinstance(row.get("email"), str)
+                ):
+                    found.append(email(row["email"]))
+                check = {
+                    "source": url,
+                    "verified": found,
+                    "result": "Verified" if found else "No verified email. Skipped.",
+                }
+                results[url] = check
+                if row.get("status") != "charge-limit":
+                    cache[url] = check
+                if found:
+                    t["verified"] = sorted(set(t.get("verified", [])) | set(found))
             persist()
-        return out
+        return [
+            results.get(url, {"source": url, "verified": [], "result": "No result. Retry available."})
+            for url in p["profiles"]
+        ]
     if op == "media":
         ans = call(
             "/" + p["modelPath"], "POST", p["input"], {"Idempotency-Key": p["id"]}

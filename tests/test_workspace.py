@@ -166,6 +166,40 @@ class WorkspaceTests(unittest.TestCase):
                 testTo="first@example.com,second@example.com",
             )
 
+    def test_email_lookup_accepts_only_confirmed_requested_profiles_and_reuses_checks(self):
+        self.key("Apify")
+        first = "https://www.linkedin.com/in/example-first"
+        second = "https://www.linkedin.com/in/example-second"
+        inputs = {"lookup": first + "\n" + second}
+        pricing = {
+            "pricingModel": "PAY_PER_EVENT",
+            "pricingPerEvent": {"actorChargeEvents": {"person-email-confirmed": {"eventPriceUsd": 0.03}}},
+        }
+        confirmed = {
+            "input": first, "email": "Work@example.com", "status": "confirmed",
+            "mailboxConfirmed": True, "sendDecision": "send",
+        }
+        rows = [
+            {**confirmed, "input": second, "status": "catch-all", "email": "guess@example.com"},
+            {**confirmed, "input": "unrequested", "email": "other@example.com"},
+            {**confirmed, "input": "", "linkedinUrl": first + "/"},
+        ]
+        with patch("providers.request", side_effect=[
+            {"data": {"pricingInfos": [pricing]}},
+            {"data": {"id": "run", "defaultDatasetId": "dataset", "status": "SUCCEEDED"}},
+            rows,
+        ]) as calls:
+            quote = self.quote("verify", **inputs)
+            self.assertIn("0.0600", quote["price"])
+            self.execute(quote)
+            request = calls.call_args_list[1].args
+            self.assertEqual(request[1], "Apify")
+            self.assertIn("maxTotalChargeUsd=0.06", request[2])
+            self.assertEqual(request[4], {"linkedinUrls": [first, second], "smtpCheck": True})
+            self.assertEqual(self.ws.status()["tracks"]["Ebook"]["verified"], ["work@example.com"])
+            self.execute(self.quote("verify", **inputs))
+            self.assertEqual(calls.call_count, 3)
+
     def test_activation_needs_verified_leads(self):
         self.key("Instantly")
         self.ws.db["tracks"]["Ebook"] = {"campaignId": "fixture"}

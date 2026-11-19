@@ -106,7 +106,7 @@ export function campaignView(C) {
             j < 7 ? "Verified" : j === 7 ? "Risky and skipped" : "Not found",
             j < 7 ? "green" : "",
           ),
-          "AI Ark (demo)",
+          "Apify (demo)",
         ]),
       ),
     );

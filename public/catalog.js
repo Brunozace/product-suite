@@ -23,16 +23,12 @@ export const channels = {
     "https://platform.openai.com/api-keys",
   ],
   Apify: [
-    "Reads public research and listings",
+    "Finds public research, listings and verified work emails",
     "https://www.apify.com?fpr=dopaminedigital",
   ],
   Higgsfield: [
     "Makes photos and short clips",
     "https://higgsfield.ai?fpr=jordan-a7ae0b",
-  ],
-  "AI Ark": [
-    "Checks business email addresses",
-    "https://www.ai-ark.com/?ref=jordan",
   ],
   Instantly: [
     "Manages inboxes and campaigns",
@@ -145,7 +141,7 @@ export const sections = {
         "Get their emails",
         "Check emails",
         "Keep only verified business addresses.",
-        "AI Ark",
+        "Apify",
         "Email lookup",
         "$0.30 est.",
         "2 min",
@@ -313,7 +309,7 @@ export function steps(section, format, hustle) {
           "Apify",
           hustle === "Airbnb Photos" ? "" : "OpenAI",
           "Higgsfield",
-          "OpenAI|AI Ark",
+          "OpenAI|Apify",
         ][i],
         [
           "Client research",
