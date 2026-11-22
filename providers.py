@@ -122,6 +122,8 @@ def request(keys, name, path, method="GET", body=None, extra=None):
     key = v.get("key", "")
     require(key, "Add your " + name + " key first. It opens below.")
     headers = {"Authorization": "Bearer " + key}
+    if name == "Instantly":
+        headers["User-Agent"] = "Dearwork/1.0"
     if name == "Spaceship":
         headers = {"X-API-Key": key, "X-API-Secret": v["secret"]}
     if name == "Nano Banana":
