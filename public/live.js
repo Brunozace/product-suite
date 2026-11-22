@@ -78,10 +78,13 @@ export function keyFields(n, track, step) {
       (dual ? field("Secret", "secret2", "", "password") : "") +
       row(
         b("Save key", "savekey", n, "primary"),
-        b("Test (free)", "testkey", n),
+        b(n === "Higgsfield" ? "Save & test (free)" : "Test (free)", "testkey", n),
         b("Remove", "removekey", n),
       ) +
-      link("Get a key", channels[n][1]) +
+      (n === "Higgsfield"
+        ? link("Get your key ID and secret in Higgsfield Console", "https://console.higgsfield.ai") +
+          '<p id="higgsfield-key-status" role="status">Enter both values, then choose Save &amp; test. Leave both blank to test a saved connection.</p>'
+        : link("Get a key", channels[n][1])) +
       (n === "OpenAI" && step
         ? modelSelect(
             "step-model",
