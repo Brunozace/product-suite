@@ -36,6 +36,17 @@ class WorkspaceTests(unittest.TestCase):
             {"name": name, "key": "fixture-only-fake-1234", "secret": "fictional"},
         )
 
+    def test_higgsfield_accepts_full_key_and_legacy_pairs(self):
+        for key, secret, credential in (
+            ("fixture-key", "", "fixture-key"),
+            ("fixture:combined", "", "fixture:combined"),
+            ("fixture-id", "fixture-secret", "fixture-id:fixture-secret"),
+        ):
+            self.ws.dispatch("key", {"name": "Higgsfield", "key": key, "secret": secret})
+            with patch("providers.send", return_value={"usd": 0}) as send:
+                self.ws.dispatch("test", {"name": "Higgsfield"})
+                self.assertEqual(send.call_args.args[2]["Authorization"], "Key " + credential)
+
     def test_secret_never_returned(self):
         self.key("Apify")
         s = json.dumps(self.ws.status())

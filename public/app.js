@@ -923,15 +923,15 @@ async function action(a, v, el) {
     }
     case "testkey":
       if (v === "Higgsfield") {
-        const key = val("secret"), secret = val("secret2");
-        if (key || secret || !live.keys[v]) {
-          if (!key || !secret) {
+        const key = val("secret");
+        if (key || !live.keys[v]) {
+          if (!key) {
             document.querySelector("#higgsfield-key-status").textContent =
-              "Enter both the Higgsfield key ID and its secret to test this connection.";
-            document.getElementById(key ? "secret2" : "secret").focus();
+              "Paste the full API key from Higgsfield to test this connection.";
+            document.getElementById("secret").focus();
             break;
           }
-          await api("key", { name: v, key, secret });
+          await api("key", { name: v, key });
           await refresh();
           missingKey(v);
           render();

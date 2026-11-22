@@ -127,7 +127,8 @@ def request(keys, name, path, method="GET", body=None, extra=None):
     if name == "Nano Banana":
         headers = {"x-goog-api-key": key}
     if name == "Higgsfield":
-        headers = {"Authorization": "Key " + key + ":" + v["secret"]}
+        credential = key + ":" + v["secret"] if v.get("secret") else key
+        headers = {"Authorization": "Key " + credential}
     if name == "Whop":
         headers["Api-Version-Date"] = "2026-11-17-3"
     return send(name, HOSTS[name] + path, {**headers, **(extra or {})}, method, body)

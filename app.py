@@ -160,7 +160,7 @@ class Workspace:
                         0 < len(k) < 8192 and "\n" not in k and "\r" not in k,
                         "Paste a valid key.",
                     )
-                    if n in ("Spaceship", "Higgsfield", "Registrar"):
+                    if n in ("Spaceship", "Registrar") or (n == "Higgsfield" and sc):
                         require(
                             sc and "\n" not in sc and "\r" not in sc,
                             "Add the secret as well.",

@@ -64,7 +64,7 @@ function modelSelect(id, current, inherit = false) {
 }
 export function keyFields(n, track, step) {
   let item = live.keys[n] || {},
-    dual = ["Higgsfield", "Spaceship"].includes(n);
+    dual = n === "Spaceship";
   return card(
     n,
     row(
@@ -82,8 +82,8 @@ export function keyFields(n, track, step) {
         b("Remove", "removekey", n),
       ) +
       (n === "Higgsfield"
-        ? link("Get your key ID and secret in Higgsfield Console", "https://console.higgsfield.ai") +
-          '<p id="higgsfield-key-status" role="status">Enter both values, then choose Save &amp; test. Leave both blank to test a saved connection.</p>'
+        ? link("Get an API key from Higgsfield", "https://open.higgsfield.ai") +
+          '<p id="higgsfield-key-status" role="status">Paste the complete API key, then choose Save &amp; test. Leave it blank to test a saved connection.</p>'
         : link("Get a key", channels[n][1])) +
       (n === "OpenAI" && step
         ? modelSelect(
