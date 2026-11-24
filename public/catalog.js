@@ -53,10 +53,10 @@ export const sections = {
       step(
         "Your idea",
         "Save idea",
-        "Start with a topic, a group of people, or something you know well.",
-        "",
+        "Find a product idea from public demand signals, or save a topic of your own.",
+        "Apify|OpenAI",
         "Idea workshop",
-        "$0",
+        "Free to save · discovery quoted",
         "1 min",
       ),
       step(

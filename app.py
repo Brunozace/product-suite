@@ -31,6 +31,7 @@ from providers import (
 )
 
 from research import quote_batch, run_batch
+from discovery import quote_discovery, run_discovery
 from live_book import quote_book, run_book
 
 ROOT = Path(__file__).resolve().parent
@@ -248,6 +249,19 @@ class Workspace:
             self.persist()
             return {"ok": True}
         if route == "note":
+            if p["step"] == "build-0" and "ideaIndex" in p:
+                ideas = track.get("ideas", [])
+                index = p["ideaIndex"]
+                require(type(index) is int and 0 <= index < len(ideas)
+                        and ideas[index]["title"] == p.get("title"),
+                        "Refresh the idea list and choose again.")
+                idea = ideas[index]
+                track["title"] = track["notes"]["build-0"] = idea["title"]
+                track["results"]["build-0"] = "\n".join(
+                    [idea["title"], idea["reason"], *(src["url"] for src in idea["sources"])]
+                )
+                self.persist()
+                return {"ok": True}
             track["notes"][p["step"]] = str(p["notes"])
             track["results"][p["step"]] = str(p["notes"])
             track["title"] = str(p.get("title", ""))
@@ -255,7 +269,7 @@ class Workspace:
             return {"ok": True}
         if route == "quote":
             require(
-                p.get("op") in {*PROVIDER, "batch", "book"},
+                p.get("op") in {*PROVIDER, "batch", "book", "discover"},
                 "Choose a supported action.",
             )
             if p.get("op") == "campaign":
@@ -270,7 +284,7 @@ class Workspace:
                     "Use a dedicated sending inbox for this track.",
                 )
             cost, description = (
-                {"batch": quote_batch, "book": quote_book}.get(p["op"], quote_job)
+                {"batch": quote_batch, "book": quote_book, "discover": quote_discovery}.get(p["op"], quote_job)
             )(p, track, cfg, keys)
             require(
                 self.reserved + cost <= cfg["cap"],
@@ -307,17 +321,18 @@ class Workspace:
             k: v for k, v in self.tickets.items() if v[1]["track"] != p["track"]
         }
         result = (
-            {"batch": run_batch, "book": run_book}.get(p["op"], run_job)
+            {"batch": run_batch, "book": run_book, "discover": run_discovery}.get(p["op"], run_job)
         )(p, track, cfg, keys, self.persist)
         output = (
             result
             if isinstance(result, str)
             else json.dumps(result, indent=2, ensure_ascii=False)
         )
-        track["results"][p["step"]] = output[:300000]
-        track["notes"][p["step"]] = p.get("notes", "")
-        if p.get("title"):
-            track["title"] = p["title"]
+        if p["op"] != "discover":
+            track["results"][p["step"]] = output[:300000]
+            track["notes"][p["step"]] = p.get("notes", "")
+            if p.get("title"):
+                track["title"] = p["title"]
         self.events.insert(
             0,
             [

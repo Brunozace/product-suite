@@ -164,16 +164,9 @@ export function productView(C) {
                 "Small, practical protein meals for adults taking GLP-1 medicines.",
               "area",
             ) +
-            '<div class="chips">' +
-            [
-              "GLP-1 protein",
-              "Perimenopause sleep",
-              "ADHD home reset",
-              "Crochet pattern sellers",
-            ]
-              .map((x) => b(x, "example", x))
-              .join("") +
-            "</div>",
+            card("Five sample ideas (demo)", pockets.map(([title, , need], index) =>
+              row(b((index + 1) + ". " + title, "example", title), e(need))
+            ).join("")),
         ) +
         card(
           "What happens next",

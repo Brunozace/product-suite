@@ -730,6 +730,10 @@ async function liveAction(op, retry = "") {
     op = "note";
   }
   if (op === "note") {
+    if (p.step === "build-0") {
+      if (!p.title.trim() && !p.notes.trim()) throw Error("Enter an idea or choose Find me an idea.");
+      p.notes = p.notes.trim() || p.title.trim();
+    }
     await api("note", p);
     await refresh();
     render();
@@ -1025,6 +1029,15 @@ async function action(a, v, el) {
             render();
           },
         );
+      break;
+    }
+    case "useidea": {
+      const idea = live.tracks[C.t]?.ideas?.[j];
+      if (!idea) throw Error("Choose a saved idea.");
+      await api("note", { ...capture(), title: idea.title, ideaIndex: j });
+      await refresh();
+      render();
+      toast("Idea saved. Open See what sells to research it.");
       break;
     }
     case "liveop":

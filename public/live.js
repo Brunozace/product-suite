@@ -137,7 +137,7 @@ export function settingsView(C) {
 const operations = (C) => {
   let { s, i, t } = C;
   let n = s === "clients" ? i + 2 : i;
-  if (s === "build" && i === 0) return ["note"];
+  if (s === "build" && i === 0) return ["discover", "note"];
   if (s === "outreach" || s === "clients")
     return [
       ["batch", "robot"],
@@ -165,6 +165,7 @@ const operations = (C) => {
   return ["write"];
 };
 export const opNames = {
+  discover: "Find me an idea",
   batch: "Research public sources",
   book: "Write the product",
   mediaStatus: "Check media job",
@@ -199,6 +200,20 @@ export function liveView(C) {
             row(b("Copy", "copy", result), b("Download", "livedown", result)),
         )
       : '<div class="hiddenlive"><b>Your result will appear here.</b><p>Review the inputs, then choose the action above.</p></div>';
+  if (o.includes("discover")) {
+    const ideas = track.ideas || [];
+    return (ideas.length ? card("Ideas ranked by demand signals", ideas.map((idea, i) =>
+      card((i + 1) + ". " + idea.title,
+        "<p>" + e(idea.reason) + "</p>" +
+        row(...idea.sources.map(source => link(source.title, source.url))) +
+        b("Use this idea", "useidea", i))
+    ).join("")) : card("Find a starting point",
+      "<p>Search public discussions, product listings and tutorials for problems people want help solving. Review the ranked ideas and their sources, then choose one to research further.</p>")) +
+      card(track.title ? "Your saved idea" : "Or start with your own idea",
+        field("Topic or product idea", "live-title", track.title || "") +
+        field("Audience, experience or demand you have seen (optional)", "live-notes", track.notes?.[id] || "", "area") +
+        b("Save my idea", "liveop", "note"));
+  }
   const forms = [
     field(
       "Product or service name",
