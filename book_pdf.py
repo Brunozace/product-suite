@@ -19,7 +19,7 @@ def literal(text):
 
 
 class Document:
-    def __init__(self):
+    def __init__(self, cover=None):
         self.objects = [b"", b""]
         self.pages = []
         self.ops = []
@@ -31,7 +31,7 @@ class Document:
             )
             for f in ["Helvetica", "Helvetica-Bold", "Times-Roman"]
         ]
-        pic = (Path(__file__).parent / "public/media/plate.jpg").read_bytes()
+        pic = cover or (Path(__file__).parent / "public/media/plate.jpg").read_bytes()
         # JPEG dimensions are read directly from its Start Of Frame segment.
         m = re.search(b"\xff[\xc0\xc1\xc2]..(.)(..)(..)", pic, re.S)
         height, width = int.from_bytes(m[2], "big"), int.from_bytes(m[3], "big")
@@ -133,13 +133,13 @@ class Document:
         self.y -= 63
 
 
-def render_pdf(payload):
+def render_pdf(payload, cover=None):
     title = str(payload["title"])[:120]
     units = payload["units"]
     sources = payload["sources"]
     if not 1 <= len(units) <= 60 or len(sources) > 100:
         raise ValueError("Book is too large.")
-    doc = Document()
+    doc = Document(cover)
     doc.command("0.94 0.92 0.85 rg 0 0 432 648 re f")
     live = payload.get("liveProduct") is True
     doc.text(payload.get("format", "Book").upper() if live else "THE KITCHEN FIELD GUIDE", 580, 11, 1)
@@ -147,6 +147,8 @@ def render_pdf(payload):
     for part in textwrap.wrap(title, 20):
         doc.text(part, y, 34, 2)
         y -= 40
+    if cover and live:
+        doc.command("q 250 0 0 304 91 42 cm /Photo Do Q")
     if not live:
         doc.photo_band(115, 222)
         doc.text("General information, not medical advice.", 78, 10)

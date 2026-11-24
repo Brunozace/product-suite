@@ -231,7 +231,12 @@ class Workspace:
             book = track.get("book", {})
             key = str(p["unit"])
             require(key in book.get("units", {}), "Choose a built unit.")
-            book["units"][key] = str(p["text"])[:60000]
+            if p.get("undo"):
+                require(key in book.get("originalUnits", {}), "No saved edit to undo.")
+                book["units"][key] = book["originalUnits"].pop(key)
+            else:
+                book.setdefault("originalUnits", {}).setdefault(key, book["units"][key])
+                book["units"][key] = str(p["text"])[:60000]
             self.persist()
             return {"ok": True}
         if route == "stepmodel":
@@ -246,6 +251,11 @@ class Workspace:
             else:
                 overrides.pop(p["step"], None)
             self.tickets.clear()
+            self.persist()
+            return {"ok": True}
+        if route == "savedraft":
+            require(not track.get("campaignId"), "Edit a created campaign in Instantly.")
+            track["mailDraft"] = {k: str(p.get(k, ""))[:20000] for k in ("sender", "subject", "body", "followSubject", "followBody")}
             self.persist()
             return {"ok": True}
         if route == "offerprice":
@@ -332,6 +342,10 @@ class Workspace:
                 }
                 p["instruction"] += (" Use the product details below. Distinguish planned material from finished "
                                      "deliverables and use the saved price when present. " + json.dumps(offer))
+            if p["op"] == "write" and p["step"] in ("outreach-3", "clients-1"):
+                p["instruction"] += (" Return only JSON with four nonempty string fields subject, body, followSubject, followBody. "
+                                     "Use a neutral greeting. No fictitious recipient details, signature or address. "
+                                     "This is a draft for review. The sender footer is appended separately.")
             cost, description = (
                 {"batch": quote_batch, "book": quote_book, "discover": quote_discovery}.get(p["op"], quote_job)
             )(p, track, cfg, keys)
@@ -377,7 +391,23 @@ class Workspace:
             if isinstance(result, str)
             else json.dumps(result, indent=2, ensure_ascii=False)
         )
-        if p["op"] != "discover":
+        if p["op"] == "coverStatus":
+            track["coverState"] = result.get("status", "unknown")
+            if track["coverState"] == "completed":
+                from cover_art import save_cover
+                images = result.get("images") or []
+                require(images, "Higgsfield completed without returning a cover image.")
+                save_cover(images[0]["url"], self.folder / (p["track"] + "-cover.jpg"))
+                track["coverVersion"] = track["coverId"]
+        if p["op"] == "write" and p["step"] in ("outreach-3", "clients-1"):
+            try:
+                draft = json.loads(output.strip().removeprefix("```json").removesuffix("```").strip())
+            except ValueError:
+                draft = None
+            require(isinstance(draft, dict) and all(isinstance(draft.get(k), str) and draft[k].strip()
+                    for k in ("subject", "body", "followSubject", "followBody")), "Incomplete email draft. Your saved emails are unchanged.")
+            track["mailDraft"] = {**{k: draft[k] for k in ("subject","body","followSubject","followBody")}, "sender": p.get("sender", "")}
+        if p["op"] not in ("discover", "cover", "coverStatus"):
             if p["op"] == "write" and p["step"] == "build-5":
                 track.update(voiceReport=output, voiceOriginal=p["original"])
             if p["op"] == "write" and p["step"] == "build-3":
@@ -444,6 +474,13 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed():
             return self.response(403, {"error": "Open the local workspace."})
         p = unquote(urlsplit(self.path).path)
+        if p.startswith("/covers/"):
+            track = p.removeprefix("/covers/")
+            if track in TRACKS:
+                cover = self.server.workspace.folder / (track + "-cover.jpg")
+                if cover.is_file():
+                    return self.response(200, cover.read_bytes(), "image/jpeg")
+            return self.response(404, {"error":"No saved cover."})
         if p == "/health":
             return self.response(200, {"ok": True, "application": "Dearwork"})
         if p == "/api/session":
@@ -472,7 +509,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.path == "/api/pdf"
                 and self.headers.get("X-Product-Export") == "book"
             ):
-                return self.response(200, render_pdf(p), "application/pdf")
+                track = p.get("coverTrack")
+                cover = self.server.workspace.folder / (track + "-cover.jpg") if track in TRACKS else None
+                return self.response(200, render_pdf(p, cover.read_bytes() if cover and cover.is_file() else None), "application/pdf")
             ws = self.server.workspace
             if not secrets.compare_digest(
                 self.headers.get("X-Product-Session", ""), ws.token

@@ -1706,6 +1706,17 @@ pre {
   gap: 24px;
 }
 .studio-head .actions { justify-content: flex-end; }
+.cover-art { display:block;width:100%;height:auto;border-radius:4px; }
+.sequence { margin:16px 0; }
+.sequence > input { position:absolute; opacity:0; width:1px; }
+.sequence > label { display:inline-block; padding:8px 12px; cursor:pointer; border-bottom:2px solid var(--line); }
+.sequence > input:checked + label { border-color:var(--lilac); color:var(--lilac); }
+.sequence > input:focus-visible + label { outline:2px solid var(--lilac); }
+.letter { padding:16px; background:#fffefa; color:#29232c; border-radius:8px; margin-top:8px; }
+.letter .field { color:#514957; }
+.letter input,.letter textarea { color:#29232c; background:white; border-color:#d9d3dd; }
+.letter textarea { min-height:190px; }
+#mail-first:checked ~ .letter-second,#mail-second:checked ~ .letter-first { display:none; }
 .reader-layout { display:grid; grid-template-columns:minmax(160px, 1fr) minmax(0, 3fr); gap:20px; align-items:start; }
 .reader-layout aside nav { display:grid; gap:5px; margin-top:15px; }
 .reader-layout aside nav button { text-align:left; white-space:normal; }

@@ -42,6 +42,7 @@ import { productView, chapterText, kit, kitTabs } from "./product.js";
 import { campaignView, replyView } from "./campaign.js";
 import { planningView } from "./planning.js";
 import { studio, selectChapter } from "./studio.js";
+import { outreachPage, useTemplate } from "./outreach.js";
 import { serviceView, pkg, filesFor } from "./services.js";
 import {
   live,
@@ -329,6 +330,8 @@ function services() {
 }
 function stepPage() {
   if (!demo) {
+    const outreach = outreachPage(state(), live.tracks[state().t] || {}, live);
+    if (outreach) return outreach;
     const view = studio(state(), live.tracks[state().t] || {});
     if (view) return view;
   }
@@ -705,6 +708,7 @@ function capture() {
     stock: val("live-stock"),
     modelPath: val("media-model"),
     mediaInput: val("media-input"),
+    coverPrompt: val("cover-prompt"),
     mediaPrice: val("media-price"),
     replyId: val("reply-id"),
     checkout: val("checkout-url"),
@@ -751,6 +755,10 @@ async function liveAction(op, retry = "") {
   }
   const status = document.querySelector("#request-status");
   status.textContent = "Preparing the cost estimate for " + opNames[op] + "…";
+  if (["outreach-3", "clients-1"].includes(p.step)) {
+    p.title ||= live.tracks[p.track]?.title || p.track;
+    if (op === "write") p.notes = "Offer: " + p.title + "\nExisting subject and body: " + p.subject + "\n" + p.body;
+  }
   let q;
   try {
     q = await api("quote", { ...p, op });
@@ -789,6 +797,7 @@ async function pdf(down, liveBook = false) {
       format: C.f,
       title: bk.title,
       liveProduct: true,
+      coverTrack: C.t,
       sources: bk.sources,
       units: Object.entries(bk.units).map(([i, text]) => ({
         title: bk.titles[i],
@@ -1002,11 +1011,13 @@ async function action(a, v, el) {
         ) + b("Save unit", "saveliveunit", v),
       );
       break;
+    case "undoliveunit":
     case "saveliveunit":
       await api("editunit", {
         track: C.t,
         step: screen + "-" + idx,
         unit: v,
+        undo: a === "undoliveunit",
         text: val("live-unit-text"),
       });
       await refresh();
@@ -1054,6 +1065,19 @@ async function action(a, v, el) {
             render();
           },
         );
+      break;
+    }
+    case "usetemplate":
+      useTemplate(v);
+      break;
+    case "usesender":
+    case "savedraft": {
+      const payload = capture();
+      if (a === "usesender") Object.assign(payload, live.tracks[C.t]?.mailDraft || {}, {sender:v});
+      await api("savedraft", payload);
+      await refresh();
+      render();
+      toast(a === "usesender" ? "Sender selected." : "Email draft saved.");
       break;
     }
     case "readchapter":

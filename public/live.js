@@ -166,6 +166,8 @@ const operations = (C) => {
   return ["write"];
 };
 export const opNames = {
+  cover: "Generate ebook cover",
+  coverStatus: "Check cover job",
   discover: "Find me an idea",
   batch: "Research public sources",
   book: "Write the product",

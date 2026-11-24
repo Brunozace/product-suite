@@ -43,6 +43,8 @@ PROVIDER = {
     "write": "OpenAI",
     "media": "Higgsfield",
     "mediaStatus": "Higgsfield",
+    "cover": "Higgsfield",
+    "coverStatus": "Higgsfield",
     "hidden": "Whop",
     "publish": "Whop",
     "hide": "Whop",
@@ -315,7 +317,15 @@ def quote_job(p, t, cfg, keys):
         else:
             desc += "Show previously checked profiles at no additional charge.\n"
         desc += "\n".join(urls)
-    elif op == "media":
+    elif op in ("media", "cover"):
+        if op == "cover":
+            require(p["step"] == "build-4" and p.get("coverPrompt", "").strip(), "Enter a cover art brief.")
+            require(not t.get("coverId") or t.get("coverState") in ("completed","failed","nsfw","canceled"),
+                    "A cover job already exists. Check its status before generating another.")
+            from cover_art import image_tools
+            image_tools()
+            p["modelPath"] = "higgsfield-ai/soul/v2/standard"
+            p["mediaInput"] = json.dumps({"prompt": p["coverPrompt"][:4000]})
         path = p["modelPath"]
         require(
             re.fullmatch(r"higgsfield-ai(?:/[\w-]+){1,6}", path),
@@ -332,8 +342,8 @@ def quote_job(p, t, cfg, keys):
             + ". Provider estimate for these exact parameters.\n"
             + json.dumps(p["input"], indent=2)
         )
-    elif op == "mediaStatus":
-        require(t.get("mediaId"), "Run a media job first.")
+    elif op in ("mediaStatus", "coverStatus"):
+        require(t.get("coverId" if op == "coverStatus" else "mediaId"), "Run a media job first.")
         desc += "Read current job status and output links."
     elif op == "hidden":
         require(p["title"], "Enter a product name.")
@@ -566,12 +576,17 @@ def run_job(p, t, cfg, keys, persist):
             results.get(url, {"source": url, "verified": [], "result": "No result. Retry available."})
             for url in p["profiles"]
         ]
-    if op == "media":
+    if op in ("media", "cover"):
         ans = call(
             "/" + p["modelPath"], "POST", p["input"], {"Idempotency-Key": p["id"]}
         )
+        if op == "cover":
+            t.update(coverId=str(ans["request_id"]), coverState=ans.get("status", "queued"), coverPrompt=p["coverPrompt"])
+            return {"status": t["coverState"]}
         t["mediaId"] = str(ans["request_id"])
         return {"request_id": t["mediaId"], "status": ans.get("status", "queued")}
+    if op == "coverStatus":
+        return call("/requests/" + quote(t["coverId"], safe="") + "/status")
     if op == "mediaStatus":
         return public_data(
             call("/requests/" + quote(t["mediaId"], safe="") + "/status")
@@ -646,15 +661,16 @@ def run_job(p, t, cfg, keys, persist):
     if op == "inboxes":
         response = call("/accounts?limit=100")
         rows = response if isinstance(response, list) else response.get("items", [])
-        return [
+        t["inboxes"] = [
             {
                 k: r[k]
-                for k in ("name", "email", "id", "domain", "status", "warmup_status")
+                for k in ("name", "email", "id", "domain", "status", "warmup_status", "daily_limit", "stat_warmup_score")
                 if k in r
             }
             for r in rows
             if isinstance(r, dict)
         ]
+        return t["inboxes"]
     if op == "campaign":
         req = {
             "name": "Selling: " + p["title"],
@@ -717,6 +733,7 @@ def run_job(p, t, cfg, keys, persist):
         )
         persist()
         call("/campaigns/" + t["campaignId"] + "/pause", "POST", {})
+        t["campaignStatus"] = "Paused"
         return {"campaign": t["campaignId"], "status": "Paused"}
     cid = t.get("campaignId", "")
     if op == "leads":
@@ -753,7 +770,31 @@ def run_job(p, t, cfg, keys, persist):
         t["campaignStatus"] = "Sending" if op == "activate" else "Paused"
         return {"campaign": cid, "status": t["campaignStatus"]}
     if op == "analytics":
-        return public_data(call("/campaigns/analytics?" + urlencode({"id": cid})))
+        data = call("/campaigns/analytics?" + urlencode({"id": cid}))
+        items = data if isinstance(data, list) else data.get("items", [data])
+        t["analytics"] = next((r for r in items if r.get("campaign_id", r.get("id", cid)) == cid), {})
+        states = {0:"Draft", 1:"Sending", 2:"Paused", 3:"Completed", 4:"Running subsequences",
+                  -99:"Suspended", -1:"Accounts unhealthy", -2:"Bounce protection"}
+        state = states.get(t["analytics"].get("campaign_status"))
+        if state:
+            t["campaignStatus"] = state
+        t["activityWarnings"] = []
+        try:
+            sent = call("/emails?" + urlencode({"campaign_id": cid, "limit": 30}))
+            t["timeline"] = [{k: r.get(k) for k in ("ue_type", "timestamp_email", "lead", "eaccount", "subject")}
+                             for r in sent.get("items", []) if r.get("campaign_id") == cid]
+        except ValueError as err:
+            t["activityWarnings"].append("Email log could not refresh. " + str(err))
+        if t.get("sender"):
+            today = datetime.now(timezone.utc).date().isoformat()
+            try:
+                daily = call("/accounts/analytics/daily?" + urlencode(
+                    {"start_date": today, "end_date": today, "emails": t["sender"]}))
+                t["senderUsage"] = next((r for r in daily if r.get("email_account") == t["sender"]
+                                         and r.get("date") == today), {})
+            except ValueError as err:
+                t["activityWarnings"].append("Daily inbox usage could not refresh. " + str(err))
+        return t["analytics"]
     if op == "replies":
         ans = call(
             "/emails?"

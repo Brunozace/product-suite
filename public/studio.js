@@ -44,12 +44,20 @@ function reader(C,t) {
   const titles = t.book?.titles || planOutline(t.results?.["build-3"] || "");
   const units = t.book?.units || {};
   const i = Math.min(chapter.get(C.t) || 0, Math.max(0,titles.length-1));
-  return '<div class="reader-layout"><aside>' + '<div class="studio-cover"><small>' + e(C.t) + '</small><strong>' + e(t.title || "Your product") + '</strong></div>' +
+  const art=t.coverVersion?'<img class="cover-art" alt="Generated cover artwork" src="/covers/'+encodeURIComponent(C.t)+'?v='+encodeURIComponent(t.coverVersion)+'">':"";
+  const cover=card("Cover artwork · Higgsfield",field("Art direction","cover-prompt",t.coverPrompt ||
+    "Create a polished editorial cover illustration for "+(t.title || C.t)+". Use a single clear subject, a portrait composition and no lettering.","area")+
+    row(op("Review cover estimate","cover"),t.coverId?op("Check cover job","coverStatus"):"",t.coverState?badge(t.coverState):""));
+  return stats([[Object.keys(units).length,"Units written"],[(t.book?.sources || []).length,"Sources"],
+    [Object.values(units).join(" ").split(/\s+/).filter(Boolean).length,"Manuscript words"]])+
+    '<div class="reader-layout"><aside>' + '<div class="studio-cover">'+art+'<small>' + e(C.t) + '</small><strong>' + e(t.title || "Your product") + '</strong></div>' +
     '<nav aria-label="Contents">' + titles.map((title,j) => b((j+1)+". "+title,"readchapter",j,i===j?"chosen":"")).join("") + "</nav></aside>" +
     '<article class="studio-paper">' + badge(titles.length ? "Unit " + (i+1) + " of " + titles.length : "Manuscript") +
-    "<h2>" + e(titles[i] || "Build from your plan") + "</h2>" + (units[i] ? prose(units[i]) + b("Edit this unit","editliveunit",i) :
+    "<h2>" + e(titles[i] || "Build from your plan") + "</h2>" + (units[i] ? prose(units[i]) + row(b("Edit this unit","editliveunit",i),
+      t.book?.originalUnits?.[i]!==undefined?b("Undo edits","undoliveunit",i):"") :
     "<p>Review the outline and source material below, then build the manuscript.</p>") + "</article></div>" +
-    pdf(t) + '<details class="card"' + (titles.length ? "" : " open") + '><summary>Outline and source material</summary>' +
+    pdf(t) + cover + (t.book?.sources?.length?card("Sources",row(...t.book.sources.map(([name,url],j)=>safe(url)?link("["+ (j+1) +"] "+name,url):e(name)))):"") +
+    '<details class="card"' + (titles.length ? "" : " open") + '><summary>Outline and source material</summary>' +
     field("Product title","live-title",t.title || "") + field("Outline, one title per line","book-outline",titles.join("\n"),"area") +
     field("Reviewed brief and sources","live-notes",t.notes?.["build-4"] || t.results?.["build-3"] || "","area") + "</details>";
 }
