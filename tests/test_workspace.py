@@ -36,6 +36,38 @@ class WorkspaceTests(unittest.TestCase):
             {"name": name, "key": "fixture-only-fake-1234", "secret": "fictional"},
         )
 
+    def test_guided_plan_requires_current_market_and_selected_buyer(self):
+        payload = {"track": "Ebook", "step": "build-3", "op": "write", "guided": True,
+                   "title": "Pencil practice", "notes": "", "instruction": "Plan"}
+        with self.assertRaisesRegex(ValueError, "Choose an idea"):
+            self.ws.dispatch("quote", payload.copy())
+        track = self.ws.db["tracks"]["Ebook"]
+        track["results"].update({"build-0": "Pencil practice", "build-2": "| Teachers |",
+                                 "build-3": "Old outline"})
+        track.update(research={"build-1": {"Retail": {"rows": [{"title": "Tracing sheets"}]}}},
+                     buyer="Families")
+        self.ws.dispatch("pickbuyer", dict(payload, step="build-2", buyer="Teachers"))
+        self.assertFalse(self.ws.status()["tracks"]["Ebook"]["completedSteps"][3])
+        with patch("app.quote_job", return_value=(0, "Review plan")) as quote:
+            self.ws.dispatch("quote", payload.copy())
+            self.assertIn("Teachers", quote.call_args.args[0]["instruction"])
+        with self.assertRaisesRegex(ValueError, "Create the product plan"):
+            self.ws.dispatch("quote", dict(payload, step="build-4", op="book"))
+        self.ws.dispatch("note", dict(payload, step="build-0", notes="New topic", title="New topic"))
+        self.assertEqual(self.ws.status()["tracks"]["Ebook"]["completedSteps"], [True]+[False]*6)
+
+    def test_apply_reviewed_voice_preserves_remainder_and_allows_undo(self):
+        t = {"results": {"build-0": "Idea", "build-3": "Plan", "build-6": "Offer"},
+             "research": {"build-1": {"Evidence": {"rows": [{"title": "Market"}]}}},
+             "buyer": "Teachers", "book": {"titles": ["One"], "units": {"0": "Opening. Rest."}},
+             "voiceOriginal": "Opening.", "voiceReport": "## Adapted excerpt\nTry this."}
+        self.ws.db["tracks"]["Ebook"] = t
+        self.ws.dispatch("applyvoice", {"track": "Ebook", "step": "build-5"})
+        self.assertEqual(t["book"]["units"]["0"], "Try this. Rest.")
+        self.assertIn(6, t["staleSteps"])
+        self.ws.dispatch("editunit", {"track": "Ebook", "step": "build-4", "unit": 0, "undo": True})
+        self.assertEqual(t["book"]["units"]["0"], "Opening. Rest.")
+
     def test_higgsfield_accepts_full_key_and_legacy_pairs(self):
         for key, secret, credential in (
             ("fixture-key", "", "fixture-key"),

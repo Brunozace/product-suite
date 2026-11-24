@@ -28,7 +28,7 @@ export function planOutline(report) {
 }
 export function planningView(C, track) {
   const buyers = C.i === 2;
-  const report = track.results?.["build-" + C.i] || "";
+  const report = (buyers && track.needsBuyerScores ? "" : track.results?.["build-" + C.i]) || "";
   const chosen = track.buyer || "";
   const action = buyers ? "Score buyer groups" : "Create product plan";
   const full = report ? '<details class="card"><summary>Read full saved ' +
@@ -39,7 +39,7 @@ export function planningView(C, track) {
     const groups = buyerGroups(report);
     body = groups.map((g, i) => card(g.name,
       '<div class="buyer-layout"><div>' + row(badge(g.total + " / 25"), i === 0 ? badge("Top score") : "",
-        chosen === g.name ? badge("Selected", "green") : b("Pick this group", "pickbuyer", g.name)) +
+        chosen === g.name && !track.staleSteps?.includes(2) ? badge("Selected", "green") : b("Pick this group", "pickbuyer", g.name)) +
       "<p>" + evidence(g.reason) + "</p></div><div>" + labels.map((label, j) =>
         '<div class="spread small">' + label + "<b>" + g.scores[j] + '/5</b></div><div class="bar"><i style="width:' +
         g.scores[j] * 20 + '%"></i></div>').join("") + "</div></div>", chosen === g.name ? "buyer-selected" : "")).join("");

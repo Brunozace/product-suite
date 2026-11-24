@@ -14,9 +14,10 @@ def quote_book(p, t, cfg, keys):
         p.get("title") and p.get("notes"),
         "Enter a title and reviewed source material before writing.",
     )
-    urls = list(dict.fromkeys(re.findall(r"https://[^\s<>()]+", p["notes"])))
+    brief = p["notes"] + p.get("bookContext", "")
+    urls = list(dict.fromkeys(re.findall(r"https://[^\s<>()]+", brief)))[:100]
     sig = hashlib.sha256(
-        json.dumps([titles, p["title"], p["notes"], p["track"]]).encode()
+        json.dumps([titles, p["title"], brief, p["track"]]).encode()
     ).hexdigest()
     existing = t.get("book", {}) if t.get("book", {}).get("signature") == sig else {}
     jobs = []
@@ -40,6 +41,7 @@ def quote_book(p, t, cfg, keys):
         job = {
             **p,
             "op": "write",
+            "notes": brief,
             "instruction": f"{prompt} This is unit {i + 1}: {title}. Full outline: "
             + ", ".join(titles)
             + ". Source index:\n"
@@ -49,6 +51,9 @@ def quote_book(p, t, cfg, keys):
         bound, _ = quote_job(job, t, cfg, keys)
         cost += bound
         jobs.append(job)
+    if not jobs and existing and 4 in t.get("staleSteps", []):
+        p.update(bookJobs=[], signature=sig, titles=titles, sources=existing.get("sources", []))
+        return 0, "The saved manuscript matches the reviewed plan and buyer. Reuse its completed units."
     require(
         jobs,
         "Every unit in this outline is already built. Edit the saved product below.",
@@ -72,6 +77,8 @@ def run_book(p, t, cfg, keys, persist):
             "sources": p["sources"],
             "units": {},
         }
+    if 4 in t.get("staleSteps", []):
+        t["staleSteps"].remove(4)
     for job in p["bookJobs"]:
         draft = run_job(job, t, cfg, keys, persist)
         require(

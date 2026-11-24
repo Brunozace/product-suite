@@ -31,6 +31,7 @@ from providers import (
 )
 
 from research import quote_batch, run_batch
+from workflow import changed, completed, prepare
 from discovery import quote_discovery, run_discovery
 from live_book import quote_book, run_book
 
@@ -131,7 +132,7 @@ class Workspace:
         return {
             "keys": keys,
             "config": self.db["config"],
-            "tracks": self.db["tracks"],
+            "tracks": {name: {**t, "completedSteps": completed(t)} for name, t in self.db["tracks"].items()},
             "polling": list(self.polling),
             "reserved": self.reserved,
             "events": self.events[:30],
@@ -227,6 +228,21 @@ class Workspace:
             value = run_job({"op": "replies"}, track, cfg, keys, self.persist)
             self.persist()
             return value
+        if route == "applyvoice":
+            require(p["step"] == "build-5" and all(completed(track)[:6]), "Review the current creator analysis first.")
+            book = track["book"]
+            text = book["units"].get("0", "")
+            original = track.get("voiceOriginal", "")
+            parts = re.split(r"^##\s+Adapted excerpt\s*$", track.get("voiceReport", ""), maxsplit=1, flags=re.I | re.M)
+            require(original and text.startswith(original) and len(parts) == 2 and parts[1].strip()
+                    and not track.get("voiceApplied"), "Review a fresh adaptation for the current opening.")
+            book.setdefault("originalUnits", {}).setdefault("0", text)
+            book["units"]["0"] = parts[1].strip() + text[len(original):]
+            track["voiceApplied"] = True
+            changed(track, 5)
+            self.tickets.clear()
+            self.persist()
+            return {"ok": True}
         if route == "editunit":
             book = track.get("book", {})
             key = str(p["unit"])
@@ -237,6 +253,8 @@ class Workspace:
             else:
                 book.setdefault("originalUnits", {}).setdefault(key, book["units"][key])
                 book["units"][key] = str(p["text"])[:60000]
+            track["staleSteps"] = sorted(set(track.get("staleSteps", [])) | {5, 6})
+            self.tickets.clear()
             self.persist()
             return {"ok": True}
         if route == "stepmodel":
@@ -267,6 +285,9 @@ class Workspace:
             profiles = track.get("research", {}).get("outreach-0", {}).get("Creators", {}).get("rows", [])
             require(p["step"] == "outreach-0" and p.get("creator") and
                     any(r.get("username") == p["creator"] for r in profiles), "Choose a researched profile.")
+            if track.get("voiceHandle") and track["voiceHandle"].lower() != p["creator"].lower():
+                track["staleSteps"] = sorted(set(track.get("staleSteps", [])) | {5, 6})
+                self.tickets.clear()
             track["creator"] = p["creator"]
             track["creatorProfile"] = next(r for r in profiles if r.get("username") == p["creator"])
             self.persist()
@@ -276,6 +297,10 @@ class Workspace:
             require(p["step"] == "build-2" and isinstance(buyer, str) and buyer
                     and buyer in track["results"].get("build-2", "").replace("**", "").replace("__", ""),
                     "Choose a group from the saved buyer analysis.")
+            if p.get("guided"):
+                require(completed(track)[1] and not track.get("needsBuyerScores"), "Score the current market research first.")
+            if buyer != track.get("buyer") or 2 in track.get("staleSteps", []):
+                changed(track, 2)
             track["buyer"] = buyer
             self.tickets.clear()
             self.persist()
@@ -288,12 +313,20 @@ class Workspace:
                         and ideas[index]["title"] == p.get("title"),
                         "Refresh the idea list and choose again.")
                 idea = ideas[index]
+                if track["notes"].get("build-0") != idea["title"]:
+                    changed(track, 0)
+                    track["needsBuyerScores"] = True
+                    self.tickets.clear()
                 track["title"] = track["notes"]["build-0"] = idea["title"]
                 track["results"]["build-0"] = "\n".join(
                     [idea["title"], idea["reason"], *(src["url"] for src in idea["sources"])]
                 )
                 self.persist()
                 return {"ok": True}
+            if p["step"] == "build-0" and (str(p["notes"]) != track["notes"].get("build-0") or p.get("title") != track.get("title")):
+                changed(track, 0)
+                track["needsBuyerScores"] = True
+                self.tickets.clear()
             track["notes"][p["step"]] = str(p["notes"])
             track["results"][p["step"]] = str(p["notes"])
             track["title"] = str(p.get("title", ""))
@@ -304,6 +337,8 @@ class Workspace:
                 p.get("op") in {*PROVIDER, "batch", "book", "discover"},
                 "Choose a supported action.",
             )
+            if p.get("guided") and p["step"].startswith("build-"):
+                prepare(p, track)
             if p.get("op") == "campaign":
                 require(p.get("title"), "Enter a campaign product or service name.")
                 require(
@@ -315,6 +350,10 @@ class Workspace:
                     ),
                     "Use a dedicated sending inbox for this track.",
                 )
+            if p.get("guided") and p["step"].startswith("launch-") and p["op"] in ("hidden","publish","write","batch"):
+                require(all(completed(track)), "Finish Ready to sell for the current product before preparing its launch.")
+                if p["op"] == "write":
+                    p["instruction"] += "\nBuyer: " + track.get("buyer","") + "\nSaved offer: " + track["results"]["build-6"][:4000]
             if p["op"] == "write" and p["step"] == "build-3" and track.get("buyer"):
                 p["instruction"] += "\nDesign this plan specifically for the selected buyer: " + track["buyer"]
             if p["op"] == "write" and p["step"] == "build-5":
@@ -323,7 +362,13 @@ class Workspace:
                 posts = research.get("Recent reels", {}).get("rows", [])
                 require(posts and handle == track.get("voiceHandle", track.get("notes", {}).get("build-5", "")).lstrip("@").lower(),
                         "Read public posts for this handle before analyzing the voice.")
-                p["original"] = track.get("book", {}).get("units", {}).get("0", "")[:1600]
+                opening = track.get("book", {}).get("units", {}).get("0", "")
+                excerpt = opening[:1600]
+                if len(opening) > len(excerpt):
+                    boundary = max(excerpt.rfind("\n\n"), excerpt.rfind(". ") + 1)
+                    if boundary > 0:
+                        excerpt = excerpt[:boundary]
+                p["original"] = excerpt
                 excerpts = [{"caption": str(r.get("caption", ""))[:450], "url": r.get("url")} for r in posts[:15]]
                 p["instruction"] = ("Analyze only the following creator posts. Give sections for voice traits, "
                     "recurring phrases, audience needs and topic counts. Link observations to supplied posts. "
@@ -409,13 +454,25 @@ class Workspace:
             track["mailDraft"] = {**{k: draft[k] for k in ("subject","body","followSubject","followBody")}, "sender": p.get("sender", "")}
         if p["op"] not in ("discover", "cover", "coverStatus"):
             if p["op"] == "write" and p["step"] == "build-5":
-                track.update(voiceReport=output, voiceOriginal=p["original"])
+                track.update(voiceReport=output, voiceOriginal=p["original"], voiceApplied=False)
             if p["op"] == "write" and p["step"] == "build-3":
                 track["planBuyer"] = track.get("buyer", "")
             track["results"][p["step"]] = output[:300000]
             track["notes"][p["step"]] = p.get("notes", "")
             if p.get("title"):
                 track["title"] = p["title"]
+        if p["step"].startswith("build-"):
+            index = int(p["step"].split("-")[1])
+            if index == 1 and p["op"] == "batch":
+                changed(track, 1)
+                track["needsBuyerScores"] = True
+            if index == 2 and p["op"] == "write":
+                track["needsBuyerScores"] = False
+                track["staleSteps"] = sorted(set(track.get("staleSteps", [])) | set(range(2, 7)))
+            if (index in (3, 5, 6) and p["op"] == "write") or (index == 4 and p["op"] == "book"):
+                changed(track, index)
+            if index == 5 and p["op"] == "batch":
+                track["staleSteps"] = sorted(set(track.get("staleSteps", [])) | {5, 6})
         self.events.insert(
             0,
             [

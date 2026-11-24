@@ -25,6 +25,8 @@ Demo is fictional and uses reserved email domains. Sample business names, counts
 
 ## Live workspace
 
+Start at **Build it → Your idea**. Choose an idea, research demand, pick a scored buyer group, and review the generated product plan. The manuscript uses that plan and buyer. Research a creator, compare the adapted opening and apply it to the manuscript and PDF if you like it. Then prepare the offer and launch kit. Changing an upstream choice marks later build steps for review. In Demo, follow the same screens with sample data or choose **Load finished example** to inspect a completed project. Live keeps its own project and provider confirmations.
+
 Switch to **Live**, open **Settings**, and save the keys for the providers you intend to use. Use OpenAI for writing, Apify for research and business email lookup, Whop for checkout, and Instantly for outreach. Higgsfield is optional for generated media. Product creation and drafting can start during warmup. Before activating outreach, confirm the sending domain meets the one-month minimum in the [Instantly sending policy](https://instantly.ai/instantly-sending-policy). The app opens in Demo whenever the page is reloaded. Real project results remain in the helper.
 
 | Workflow | Available in Live |

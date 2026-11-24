@@ -261,6 +261,19 @@ def quote_job(p, t, cfg, keys):
                 ensure_ascii=False,
             )[:9000]
         )
+        if p.get("guided") and p["step"].startswith("build-"):
+            index = int(p["step"].split("-")[1])
+            saved = t.get("results", {})
+            context = "\n".join(saved.get(f"build-{i}", "")[:1300] for i in range(index)
+                                 if i != 1 and isinstance(saved.get(f"build-{i}"), str))
+            market = research.get("build-1", {})
+            for site, batch in market.items():
+                for hit in batch.get("rows", [])[:4]:
+                    if isinstance(hit, dict):
+                        details = [str(hit[k])[:260] for k in ("title","name","caption","text","description","price",
+                                   "url","webUrl","productUrl","listingUrl","webVideoUrl","videoUrl") if hit.get(k)]
+                        if details:
+                            context += "\n" + site + ": " + " ".join(details)
         p["prompt"] = (
             f"Create the {p['track']} deliverable: {p['instruction']}. Title: {title}.\nBrief and source material:\n"
             + p["notes"]

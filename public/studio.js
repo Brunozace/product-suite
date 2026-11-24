@@ -28,7 +28,7 @@ function stages(research) {
 function market(t) {
   const research=t.research?.["build-1"] || {};
   const report=t.results?.["build-1"] || "";
-  return card("Research question",field("Product or audience","live-notes",t.notes?.["build-1"] || t.title || "")+
+  return card("Research question",field("Product or audience","live-notes",(t.staleSteps?.includes(1) ? "" : t.notes?.["build-1"]) || t.title || t.notes?.["build-0"] || "")+
     op("Summarize market evidence","write")) +
     (report && !report.trimStart().startsWith("{") ? card("Market findings",prose(report)) : "") +
     grid(Object.entries(research).map(([name,r])=>card(name,
@@ -41,10 +41,10 @@ function market(t) {
       }).join(""))));
 }
 function reader(C,t) {
-  const titles = t.book?.titles || planOutline(t.results?.["build-3"] || "");
-  const units = t.book?.units || {};
+  const titles = (!t.staleSteps?.includes(4) && t.book?.titles) || planOutline(t.results?.["build-3"] || "");
+  const units = t.staleSteps?.includes(4) ? {} : t.book?.units || {};
   const i = Math.min(chapter.get(C.t) || 0, Math.max(0,titles.length-1));
-  const art=t.coverVersion?'<img class="cover-art" alt="Generated cover artwork" src="/covers/'+encodeURIComponent(C.t)+'?v='+encodeURIComponent(t.coverVersion)+'">':"";
+  const art=C.demo && t.title==="The Small Appetite Protein Plan" ? '<img class="cover-art" src="/media/plate.jpg" alt="Sample meal on a small plate">' : t.coverVersion?'<img class="cover-art" alt="Generated cover artwork" src="/covers/'+encodeURIComponent(C.t)+'?v='+encodeURIComponent(t.coverVersion)+'">':"";
   const cover=card("Cover artwork · Higgsfield",field("Art direction","cover-prompt",t.coverPrompt ||
     "Create a polished editorial cover illustration for "+(t.title || C.t)+". Use a single clear subject, a portrait composition and no lettering.","area")+
     row(op("Review cover estimate","cover"),t.coverId?op("Check cover job","coverStatus"):"",t.coverState?badge(t.coverState):""));
@@ -56,15 +56,15 @@ function reader(C,t) {
     "<h2>" + e(titles[i] || "Build from your plan") + "</h2>" + (units[i] ? prose(units[i]) + row(b("Edit this unit","editliveunit",i),
       t.book?.originalUnits?.[i]!==undefined?b("Undo edits","undoliveunit",i):"") :
     "<p>Review the outline and source material below, then build the manuscript.</p>") + "</article></div>" +
-    pdf(t) + cover + (t.book?.sources?.length?card("Sources",row(...t.book.sources.map(([name,url],j)=>safe(url)?link("["+ (j+1) +"] "+name,url):e(name)))):"") +
+    (!t.staleSteps?.includes(4) ? pdf(t) : "") + cover + (t.book?.sources?.length?card("Sources",row(...t.book.sources.map(([name,url],j)=>safe(url)?link("["+ (j+1) +"] "+name,url):e(name)))):"") +
     '<details class="card"' + (titles.length ? "" : " open") + '><summary>Outline and source material</summary>' +
     field("Product title","live-title",t.title || "") + field("Outline, one title per line","book-outline",titles.join("\n"),"area") +
-    field("Reviewed brief and sources","live-notes",t.notes?.["build-4"] || t.results?.["build-3"] || "","area") + "</details>";
+    field("Reviewed brief and sources","live-notes",(!t.staleSteps?.includes(4) && t.notes?.["build-4"]) || t.results?.["build-3"] || "","area") + "</details>";
 }
 function creatorSearch(t) {
   const research=t.research?.["outreach-0"] || {};
   const profiles=rows(research,"Creators"), reels=[...rows(research,"Topic reels"),...rows(research,"Recent work")];
-  const needle = t.notes?.["outreach-0"] || "";
+  const needle = t.notes?.["outreach-0"] || (t.title || "").split(/[:—]/)[0];
   const matches=profiles.map(p => {
     const posts=reels.filter(r => r.ownerUsername?.toLowerCase() === p.username?.toLowerCase());
     const views=posts.map(r=>r.videoPlayCount ?? r.videoViewCount).filter(v=>v!=null && Number.isFinite(Number(v))).map(Number);
@@ -102,7 +102,7 @@ function voice(t) {
     card(researched ? "Voice and audience · @"+researched.replace(/^@/,"") : "Voice and audience",
       op("Analyze voice and adapt excerpt","write") + prose(parts[0]))+
     grid([card("Original excerpt",prose((t.voiceOriginal || t.book?.units?.[0] || "").slice(0,1600))),
-      card("Adapted excerpt",parts[1]?prose(parts[1])+b("Copy adapted excerpt","copy",parts[1].trim()):"<p>The analysis will add a side-by-side sample here.</p>")]);
+      card("Adapted excerpt",parts[1]?prose(parts[1])+row(b("Copy adapted excerpt","copy",parts[1].trim()),t.voiceApplied?badge("Applied to manuscript","green"):b("Apply to manuscript","applyvoice")):"<p>The analysis will add a side-by-side sample here.</p>")]);
 }
 function contacts(t) {
   const checks=Object.values(t.checks || {});

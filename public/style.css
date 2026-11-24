@@ -1732,3 +1732,10 @@ pre {
 @media (max-width: 700px) {
   .buyer-layout { grid-template-columns: 1fr; gap: 8px; }
 }
+
+.journey { padding: 14px 18px; margin: 0 0 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.journey .spread { flex-wrap: wrap; gap: 8px; }
+.journey .spread span,.journey-context { font-size: .84rem; }
+.journey-steps { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 0; }
+.journey-steps button { padding: 5px 9px; min-height: 32px; font-size: .78rem; }
+.journey-context:not(:empty) { margin-top: 10px; overflow-wrap: anywhere; }

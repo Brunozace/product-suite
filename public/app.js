@@ -1,3 +1,4 @@
+import { demoTrack, pathView, practice, fillExample, launchPage } from "./walkthrough.js";
 import {
   formats,
   hustles,
@@ -185,12 +186,12 @@ function route() {
     : 0;
   render();
 }
-function progress() {
-  if (demo) return data.done[data.f] ?? 2;
-  return ["build-4", "outreach-1", "outreach-4", "launch-1"].filter(
-    (k) => live.tracks[data.f]?.results?.[k],
-  ).length;
+function milestones() {
+  const t = (demo ? data.tracks[data.f]?.practice : live.tracks[data.f]) || {};
+  return [t.completedSteps?.length === 7 && t.completedSteps.every(Boolean), Boolean(t.verified?.length),
+    t.campaignStatus === "Sending", Boolean(t.visible)];
 }
+const progress = () => milestones().filter(Boolean).length;
 function nav() {
   let C = state(),
     unread = [C.f, ...hustles]
@@ -205,7 +206,7 @@ function nav() {
           steps(s, C.f, C.h)
             .map((a, i) =>
               b(
-                (demo ? "✓ " : "") + a.name,
+                (s === "build" && (demo ? C.d.practice : live.tracks[C.t])?.completedSteps?.[i] ? "✓ " : "") + a.name,
                 "step",
                 s + "/" + i,
                 "navitem " + (i === idx ? "active" : ""),
@@ -215,7 +216,7 @@ function nav() {
           "</div>"
         : ""
     }`;
-  return `<aside class="nav ${navOpen ? "open" : ""}"><div class="brand"><img src="/mark.svg" alt=""><div><strong>Dearwork</strong><small>Make it, sell it, get clients</small></div>${b("×", "menu", "", "mobile quiet")}</div><div class="navscroll">${navTop("home", "Home", "home")}${navTop("unibox", "Unibox", "mail", demo ? '<span class="count">' + unread + "</span>" : "")}${navTop("settings", "Settings", "settings")}<span class="label">Digital product</span><div class="pick">${icon("book")}${select("format", formats, C.f)}</div>${groups.slice(0, 3).map(group).join("")}<span class="label">AI side hustles</span><div class="pick">${icon("layers")}${select("hustle", hustles, C.h)}</div>${groups.slice(3).map(group).join("")}</div><div class="navfoot"><div class="seg">${b("Demo", "mode", "demo", demo ? "sel" : "")}${b("Live", "mode", "live", !demo ? "sel" : "")}</div>${demo ? b("Run live demo", "tour", "", "money", "play") + '<div class="footlinks">' + b("Load all", "loadall", "", "quiet", "layers") + b("Saved", "saved", "", "quiet", "folder") + "</div>" : ""}<div class="costline"><span>${demo ? "Demo, nothing spent" : "Session budget reserved"}</span><b class="mono">$${demo ? "0.00" : Number(live.reserved || 0).toFixed(2)}</b></div></div></aside>`;
+  return `<aside class="nav ${navOpen ? "open" : ""}"><div class="brand"><img src="/mark.svg" alt=""><div><strong>Dearwork</strong><small>Make it, sell it, get clients</small></div>${b("×", "menu", "", "mobile quiet")}</div><div class="navscroll">${navTop("home", "Home", "home")}${navTop("unibox", "Unibox", "mail", demo ? '<span class="count">' + unread + "</span>" : "")}${navTop("settings", "Settings", "settings")}<span class="label">Digital product</span><div class="pick">${icon("book")}${select("format", formats, C.f)}</div>${groups.slice(0, 3).map(group).join("")}<span class="label">AI side hustles</span><div class="pick">${icon("layers")}${select("hustle", hustles, C.h)}</div>${groups.slice(3).map(group).join("")}</div><div class="navfoot"><div class="seg">${b("Demo", "mode", "demo", demo ? "sel" : "")}${b("Live", "mode", "live", !demo ? "sel" : "")}</div>${demo ? b("Run live demo", "tour", "", "money", "play") + '<div class="footlinks">' + b("Load finished example", "loadall", "", "quiet", "layers") + b("Saved", "saved", "", "quiet", "folder") + "</div>" : ""}<div class="costline"><span>${demo ? "Demo, nothing spent" : "Session budget reserved"}</span><b class="mono">$${demo ? "0.00" : Number(live.reserved || 0).toFixed(2)}</b></div></div></aside>`;
 }
 function rail() {
   let events = demo
@@ -308,7 +309,7 @@ function home() {
   ]
     .map(
       ([n, sub, g, v], i) =>
-        `<button data-act="step" data-v="${v}"><span class="ibox ${i < progress() ? "greenbox" : i === 2 ? "orangebox" : ""}">${icon(g)}</span><span><strong>${n}</strong><small>${sub}</small></span></button>`,
+        `<button data-act="step" data-v="${v}"><span class="ibox ${milestones()[i] ? "greenbox" : i === 2 ? "orangebox" : ""}">${icon(g)}</span><span><strong>${n}</strong><small>${sub}</small></span></button>`,
     )
     .join(
       "",
@@ -329,14 +330,19 @@ function services() {
   );
 }
 function stepPage() {
-  if (!demo) {
-    const outreach = outreachPage(state(), live.tracks[state().t] || {}, live);
-    if (outreach) return outreach;
-    const view = studio(state(), live.tracks[state().t] || {});
-    if (view) return view;
-  }
-  if (!demo && screen === "build" && (idx === 2 || idx === 3))
-    return planningView(state(), live.tracks[state().t] || {});
+  const ctx = state();
+  const project = demo ? demoTrack(ctx) : live.tracks[ctx.t] || {};
+  const source = demo ? {keys:{Instantly:{status:"Simulated"}},config:{name:"Alex",business:"Dearwork sample",address:"Example mailing address"}} : live;
+  const trail = screen === "build" ? pathView(ctx,project) : demo ? '<div class="crumb">Practice project · simulated data</div>' : "";
+  let shared = "";
+  if (screen === "build" && idx === 0) {
+    shared = '<div class="stepshead"><span class="eyebrow">Build it · Step 1 of 7</span><h1>Your idea</h1><p>Compare demand signals, then choose the idea to research.</p>' +
+      row(b("Find me an idea","liveop","discover","primary"),b("See what sells","next","","","arrow")) +
+      '</div><div class="stack">'+liveView(ctx,project)+'</div>';
+  } else if (screen === "build" && [2,3].includes(idx)) shared = planningView(ctx,project);
+  else if (screen === "launch") shared = launchPage(ctx,project);
+  else if (!demo || ["build","outreach"].includes(screen)) shared = studio(ctx,project) || outreachPage(ctx,project,source);
+  if (shared) return trail + shared;
   let C = state(),
     all = steps(screen, C.f, C.h),
     st = all[idx],
@@ -398,7 +404,7 @@ function render() {
                     )) +
                 "</div>"
               : stepPage();
-  root.innerHTML = `<div class="app">${nav()}<header class="topbar">${b("Menu", "menu", "", "mobile", "menu")}<span class="small"><b>Your path</b> <span class="dim">· ${progress()} of 4 done</span></span><div class="pathmini">${["Make it", "Find buyers", "Send", "Launch"].map((x, i) => (i ? "<i></i>" : "") + '<span class="dot ' + (i < progress() ? "" : i === progress() ? "now" : "later") + '"></span>' + x).join("")}</div><div class="toptools">${b("3 side hustles", "nav", "hustles", "hidephone", "layers")}${b(document.documentElement.dataset.theme === "dark" ? "Light" : "Dark", "theme", "", "", "sun")}${b("Activity", "rail", "", "mobile railbtn", "wave")}</div></header><main id="main"><div class="canvas">${helper ? "" : '<div class="notice">Local helper is offline. Run <code>python app.py</code> from the project folder.</div>'}${content}</div></main>${rail()}</div>`;
+  root.innerHTML = `<div class="app">${nav()}<header class="topbar">${b("Menu", "menu", "", "mobile", "menu")}<span class="small"><b>Your path</b> <span class="dim">· ${progress()} of 4 done</span></span><div class="pathmini">${["Make it", "Find buyers", "Send", "Launch"].map((x, i) => (i ? "<i></i>" : "") + '<span class="dot ' + (milestones()[i] ? "" : i === milestones().indexOf(false) ? "now" : "later") + '"></span>' + x).join("")}</div><div class="toptools">${b("3 side hustles", "nav", "hustles", "hidephone", "layers")}${b(document.documentElement.dataset.theme === "dark" ? "Light" : "Dark", "theme", "", "", "sun")}${b("Activity", "rail", "", "mobile railbtn", "wave")}</div></header><main id="main"><div class="canvas">${helper ? "" : '<div class="notice">Local helper is offline. Run <code>python app.py</code> from the project folder.</div>'}${content}</div></main>${rail()}</div>`;
   document.querySelector("main").scrollTop = scroll;
   document.querySelector(".navscroll").scrollTop = ns;
   document.title =
@@ -564,6 +570,7 @@ function movie(full) {
   }
   const seq = full ? sequence() : [[screen, idx]];
   tour = { seq, pos: 0, elapsed: 0, speed: 1, paused: false, full };
+  if (full) fillExample({...state(), t:data.f, d:data.tracks[data.f] ||= {}});
   go(...seq[0]);
   drawMovie();
   timer = setInterval(() => {
@@ -670,7 +677,7 @@ const specs = {
   "launch-0":
     "Provide audience, problem, promise, price, bonuses, three pitches, five objections and competitor comparison with evidence.",
   "launch-2":
-    "Write three reels, five captions, three emails, eight story frames, FAQs, a seven-day schedule, disclosure and a 12-item checklist. Include I earn from each sale on every promotional asset.",
+    "Write three reels, five captions, three emails, eight story frames, FAQs, a seven-day schedule, disclosure and a 12-item checklist. Use separate Markdown headings for Reels, Captions, Emails, Stories, FAQs, Seven-day calendar and Checklist. Include I earn from each sale on every promotional asset.",
   "work-1":
     "For Ad Remakes give Pain, Proof and Offer ads with primary text, headline, description, CTA, image idea and score. For YouTube Shorts give eight original scenes under 60 seconds. Never invent prices or testimonials.",
   "work-3":
@@ -683,6 +690,7 @@ const specs = {
 function capture() {
   let C = state();
   return {
+    guided: true,
     followSubject: val("follow-subject"),
     followBody: val("follow-body"),
     outline: val("book-outline"),
@@ -745,6 +753,7 @@ async function liveAction(op, retry = "") {
   if (op === "note") {
     if (p.step === "build-0") {
       if (!p.title.trim() && !p.notes.trim()) throw Error("Enter an idea or choose Find me an idea.");
+      p.title ||= p.notes.split("\n")[0].slice(0,200);
       p.notes = p.notes.trim() || p.title.trim();
     }
     await api("note", p);
@@ -792,12 +801,12 @@ async function pdf(down, liveBook = false) {
     sources,
   };
   if (liveBook) {
-    let bk = live.tracks[C.t].book;
+    let bk = (demo ? demoTrack(C) : live.tracks[C.t]).book;
     body = {
       format: C.f,
       title: bk.title,
       liveProduct: true,
-      coverTrack: C.t,
+      coverTrack: demo ? "" : C.t,
       sources: bk.sources,
       units: Object.entries(bk.units).map(([i, text]) => ({
         title: bk.titles[i],
@@ -844,6 +853,23 @@ async function action(a, v, el) {
     tour
   )
     stopMovie();
+  if (demo && ["build","outreach","launch"].includes(C.s)) {
+    const t = demoTrack(C);
+    if (["liveop","researchretry","useidea","pickbuyer","pickcreator","offerprice","usesender","savedraft"].includes(a)) {
+      const op = a === "liveop" ? v : a === "researchretry" ? "batch" : a;
+      practice(C,op,capture(),v);
+      log(steps(C.s,C.f,C.h)[C.i].name, "Practice project updated");
+      save(); render(); toast("Practice project updated."); return;
+    }
+    if (a === "saveliveunit" || a === "undoliveunit") {
+      const bk = t.book;
+      bk.originalUnits ||= {};
+      bk.originalUnits[v] ??= bk.units[v];
+      bk.units[v] = a === "undoliveunit" ? bk.originalUnits[v] : val("live-unit-text");
+      t.completedSteps.fill(false,5);
+      close(); save(); render(); return;
+    }
+  }
   switch (a) {
     case "nav":
       go(v);
@@ -1000,13 +1026,29 @@ async function action(a, v, el) {
       await refresh();
       render();
       break;
+    case "applyvoice": {
+      if (demo) {
+        const t=demoTrack(C);
+        const before=t.book?.units?.[0], original=t.voiceOriginal;
+        const revised=t.voiceReport?.split(/^##\s+Adapted excerpt\s*$/im)[1]?.trim();
+        if (!t.completedSteps[5] || !original || !before?.startsWith(original) || !revised || t.voiceApplied)
+          throw Error("Review a fresh adaptation for the current opening.");
+        t.book.originalUnits ||= {};
+        t.book.originalUnits[0] ??= before;
+        t.book.units[0]=revised+before.slice(original.length);
+        t.voiceApplied=true; t.completedSteps[6]=false; save();
+      } else {
+        await api("applyvoice",{track:C.t,step:"build-5"}); await refresh();
+      }
+      render();toast("Opening updated in the manuscript and PDF.");break;
+    }
     case "editliveunit":
       modal(
         "Edit product unit",
         field(
           "Draft",
           "live-unit-text",
-          live.tracks[C.t].book.units[v],
+          (demo ? demoTrack(C) : live.tracks[C.t]).book.units[v],
           "area",
         ) + b("Save unit", "saveliveunit", v),
       );
@@ -1092,7 +1134,7 @@ async function action(a, v, el) {
       toast(a === "pickcreator" ? "Creator selected for research." : "Offer price saved.");
       break;
     case "pickbuyer":
-      await api("pickbuyer", {track: C.t, step: "build-2", buyer: v});
+      await api("pickbuyer", {track: C.t, step: "build-2", buyer: v, guided: true});
       await refresh();
       render();
       toast("Buyer selected for your product plan.");
@@ -1412,6 +1454,7 @@ async function action(a, v, el) {
       );
       break;
     case "loadall":
+      fillExample({...C,t:C.f,d:data.tracks[C.f] ||= {}});
       log("All examples loaded", "Product and three service tracks", "layers");
       render();
       toast("All saved examples are ready.");

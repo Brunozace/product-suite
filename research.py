@@ -190,6 +190,8 @@ def quote_batch(p, t, cfg, keys):
 
 
 def run_batch(p, t, cfg, keys, persist):
+    if p["step"] == "build-1" and not p.get("retry"):
+        t.setdefault("research", {})["build-1"] = {}
     if p["step"] == "outreach-0":
         t.setdefault("research", {})[p["step"]] = {}
         t["searchPlatform"] = p.get("platform") or "Instagram"

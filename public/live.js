@@ -191,9 +191,8 @@ export const opNames = {
   payreply: "Send payment reply",
   localphoto: "Measure photo",
 };
-export function liveView(C) {
-  let track = live.tracks[C.t] || {},
-    o = operations(C),
+export function liveView(C, track = live.tracks[C.t] || {}) {
+  let o = operations(C),
     id = C.s + "-" + C.i,
     result = track.results?.[id],
     output = result
