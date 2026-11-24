@@ -25,15 +25,14 @@ Demo is fictional and uses reserved email domains. Sample business names, counts
 
 ## Live workspace
 
-Switch to **Live**, open **Settings**, and save the keys for the providers you intend to use. Test each account with the free connection check. The app opens in Demo whenever the page is reloaded. Real project results remain in the helper.
+Switch to **Live**, open **Settings**, and save the keys for the providers you intend to use. Use OpenAI for writing, Apify for research and business email lookup, Whop for checkout, and Instantly for outreach. Higgsfield is optional for generated media. Product creation and drafting can start during warmup. Before activating outreach, confirm the sending domain meets the one-month minimum in the [Instantly sending policy](https://instantly.ai/instantly-sending-policy). The app opens in Demo whenever the page is reloaded. Real project results remain in the helper.
 
 | Workflow | Available in Live |
 | --- | --- |
 | Market research | Preconfigured public-source research for Reddit, Amazon, Etsy, TikTok and YouTube. Each pay-per-event actor gets a separate hard cap. Independent jobs run concurrently and successful results survive individual failures. Inspect source records before using them. |
 | Products | Use reviewed research to draft the plan. Review or enter an outline and source material, generate units sequentially, edit the saved text and export a PDF. Generation checkpoints each unit. Use linked sources you have actually read. |
 | Discovery and email | Instagram research can chain hashtag reels, public profiles and recent reels. Other platforms use their own searches. The Apify LinkedIn Email Finder accepts public business LinkedIn URLs, skips risky results and records verified addresses for that track. Review identity, fit and business purpose before adding leads. |
-| Domain setup | Check six branded sending-domain suggestions (Dearwork by default), quote a one-year Spaceship registration and submit the selected domain with private registration and auto-renew off. Review a separate ScaledMail subscription per domain. External-domain orders require a registrar login, supplied only in the confirmed order. |
-| Inbox connection | Inspect provider accounts, submit supplied MX/TXT records, check them at the registrar and transfer Google mailbox credentials from ScaledMail directly to Instantly. The import skips existing inboxes and enables warmup. Some Google accounts require provider-side authorization. |
+| Sending inboxes | Use the Instantly key to inspect existing AirMail inboxes and warmup status. Manage the main domain at its registrar. |
 | Outreach | Review and edit a first email and optional day-three follow up. Create a paused Instantly campaign, add verified leads, send a single test and activate separately. Activation checks the sending account’s status and warmup age. |
 | Replies | Read the campaign’s received messages and local template drafts. Minute checks are opt-in and run while the app is open. Request a separately quoted AI rewrite when needed. Real messages are available in Instantly. |
 | Service samples | Review public listings, ads or videos. Request a Higgsfield estimate for a selected model and its parameters, generate after confirmation and check the resulting job. Compare two local photo files or compose a downloadable 1080 px ad from an approved image and headline. |
@@ -44,9 +43,9 @@ Switch to **Live**, open **Settings**, and save the keys for the providers you i
 
 - The default session cap is $10 and the default Apify cap is $1 per actor. Confirmations report the reserved ceiling. The session conservatively retains reservations after ambiguous failures. Provider invoices determine final charges. Restarting the helper starts a new spending session. A confirmed subscription renews in the provider account until cancelled there.
 - Live writing uses the OpenAI Responses API. In **Settings → OpenAI → Manage**, save your [OpenAI API key](https://platform.openai.com/api-keys) and select **Test (free)**. Under **Writing model**, choose GPT-5.4 mini (default), GPT-5.4 nano, GPT-6.2 Sol or GPT-6.2 Astra and save. The OpenAI chip on a workflow step lets you override the default for that track. Fable remains available for local writing. Existing Claude selections migrate to the new workspace default. Provider keys are kept separate. The helper counts input tokens and reserves up to 4,096 output tokens per draft at [standard OpenAI rates](https://developers.openai.com/api/docs/pricing). Available models, actor billing, provider permissions, taxes and account subscription terms can vary.
-- Email lookup uses the saved Apify key and the actor’s current price per confirmed address. Submit up to 25 new profiles per run. Cached checks are free. Enter a real sender name, business and mailing address before creating or sending email. For domain and mailbox orders, set a contact ID and workspace first. New campaigns use Eastern business hours.
+- Email lookup uses the saved Apify key and the actor’s current price per confirmed address. Submit up to 25 new profiles per run. Cached checks are free. Enter a real sender name, business and mailing address before creating or sending email. New campaigns use Eastern business hours.
 - Live workflows need real accounts and suitable scopes. Review returned data and any provider error before retrying. No production purchases, campaign sends, media jobs or publications were performed during project verification.
-- A provider may require a dashboard step for mailbox authorization, DKIM issuance or file fulfillment. The DNS check reports the registrar’s configured records. Public DNS propagation and delivery must be verified before sending. The application does not calculate payouts, process payments itself, schedule social posts or silently fulfill a paid order.
+- A provider may require a dashboard step for mailbox authorization, DKIM issuance or file fulfillment. Public DNS propagation and delivery must be verified before sending. The application does not calculate payouts, process payments itself, schedule social posts or silently fulfill a paid order.
 - Live results are organized into one workspace for each of the three product formats and three services. For multiple independent businesses of the same type, start a separate instance using a separate data folder and port, for example `python app.py --data-dir ./private-business-two --port 8766`. Keep private folders out of source archives.
 - The Demo includes designed results. Live returns the actual data supplied by the provider. Record shapes and media output differ by actor and model. A creator’s business email, permission to use their work, verified claims and actual product delivery require human review.
 
@@ -54,14 +53,14 @@ Switch to **Live**, open **Settings**, and save the keys for the providers you i
 
 The helper binds only to IPv4 loopback, checks Host and Origin, rejects cross-site requests, and requires a session token for private operations. A pasted credential is transiently present in the password input while saving. The helper returns only a masked value. LocalStorage contains theme and demo data.
 
-On Windows the private file is under `%LOCALAPPDATA%\ProductSuite\workspace.json`; an owner-only NTFS ACL is applied to its directory. Other platforms use `~/.local/share/ProductSuite/workspace.json` with private directory and file permissions. The file is access-controlled, not encrypted. Protect it like other local credentials. Keys travel over HTTPS only to the selected providers. A confirmed mailbox order can also transmit registrar login details to ScaledMail. No private data file is included in this distribution.
+On Windows the private file is under `%LOCALAPPDATA%\ProductSuite\workspace.json`; an owner-only NTFS ACL is applied to its directory. Other platforms use `~/.local/share/ProductSuite/workspace.json` with private directory and file permissions. The file is access-controlled, not encrypted. Protect it like other local credentials. Keys travel over HTTPS only to the selected providers. No private data file is included in this distribution.
 
 Each external action uses a short-lived, single-use confirmation ticket bound to its reviewed payload. The helper checks the session cap again before execution and serializes writes. Always reconcile an interrupted paid or external action in the provider dashboard before retrying.
 
 ## Project layout
 
 - `app.py` serves the browser application, stores private state and enforces confirmations.
-- `providers.py`, `research.py`, `provision.py`, `live_book.py` and `reply_drafts.py` handle provider requests, research, domain setup, manuscript generation and reply triage.
+- `providers.py`, `research.py`, `live_book.py` and `reply_drafts.py` handle provider requests, research, manuscript generation and reply triage.
 - `book_pdf.py` generates PDFs with embedded photography using Python’s standard library.
 - `public/` contains the interface, source-linked manuscript, fictional fixtures and offline media.
 - `tests/` contains provider-mocked contract tests. Run `python -m unittest discover -s tests -v`.
@@ -72,5 +71,5 @@ The ebook lists 24 linked MedlinePlus references in its reader and PDF. Partner 
 
 Bundled sample photography is from Unsplash image IDs `photo-1512621776951-a57141f2eefd` (food), `photo-1600210492486-724fe5c67fb0` (living room), `photo-1600596542815-ffad4c1539a9` (house), and `photo-1497366811353-6870744d04b2` (workspace). The darker room example and roofing ad layouts are local derivatives. The eight animated coin scenes were rendered locally for this demo.
 
-Provider references: [OpenAI Responses API](https://developers.openai.com/api/reference/resources/responses/methods/create), [Apify](https://docs.apify.com/api/v2), [LinkedIn Email Finder](https://apify.com/memo23/linkedin-email-finder), [Instantly](https://developer.instantly.ai/), [Whop](https://docs.whop.com/api-reference/overview), [Higgsfield](https://docs.higgsfield.ai/docs), [Spaceship](https://docs.spaceship.dev/), [ScaledMail](https://docs.scaledmail.com/) and [Gemini](https://ai.google.dev/api/models).
+Provider references: [OpenAI Responses API](https://developers.openai.com/api/reference/resources/responses/methods/create), [Apify](https://docs.apify.com/api/v2), [LinkedIn Email Finder](https://apify.com/memo23/linkedin-email-finder), [Instantly](https://developer.instantly.ai/), [Whop](https://docs.whop.com/api-reference/overview), [Higgsfield](https://docs.higgsfield.ai/docs).
 

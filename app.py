@@ -32,7 +32,6 @@ from providers import (
 
 from research import quote_batch, run_batch
 from live_book import quote_book, run_book
-from provision import OPS, quote_setup, run_setup
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC = (ROOT / "public").resolve()
@@ -50,8 +49,6 @@ DEFAULTS = {
     "model": DEFAULT_MODEL,
     "fable": "",
     "company": "",
-    "workspace": "",
-    "owner": "",
     "name": "",
     "business": "",
     "address": "",
@@ -128,7 +125,7 @@ class Workspace:
                 "status": v["status"],
             }
             for n, v in self.db["keys"].items()
-            if n in HOSTS or n == "Registrar"
+            if n in HOSTS
         }
         return {
             "keys": keys,
@@ -147,7 +144,7 @@ class Workspace:
         if route in ("key", "test"):
             n = p["name"]
             require(
-                n in HOSTS or (n == "Registrar" and route == "key"), "Unknown provider."
+                n in HOSTS, "Unknown provider."
             )
             self.tickets.clear()
             if route == "key":
@@ -160,7 +157,7 @@ class Workspace:
                         0 < len(k) < 8192 and "\n" not in k and "\r" not in k,
                         "Paste a valid key.",
                     )
-                    if n in ("Spaceship", "Registrar") or (n == "Higgsfield" and sc):
+                    if n == "Higgsfield" and sc:
                         require(
                             sc and "\n" not in sc and "\r" not in sc,
                             "Add the secret as well.",
@@ -258,7 +255,7 @@ class Workspace:
             return {"ok": True}
         if route == "quote":
             require(
-                p.get("op") in {*PROVIDER, *OPS, "batch", "book"},
+                p.get("op") in {*PROVIDER, "batch", "book"},
                 "Choose a supported action.",
             )
             if p.get("op") == "campaign":
@@ -273,9 +270,7 @@ class Workspace:
                     "Use a dedicated sending inbox for this track.",
                 )
             cost, description = (
-                quote_setup
-                if p["op"] in OPS
-                else {"batch": quote_batch, "book": quote_book}.get(p["op"], quote_job)
+                {"batch": quote_batch, "book": quote_book}.get(p["op"], quote_job)
             )(p, track, cfg, keys)
             require(
                 self.reserved + cost <= cfg["cap"],
@@ -312,9 +307,7 @@ class Workspace:
             k: v for k, v in self.tickets.items() if v[1]["track"] != p["track"]
         }
         result = (
-            run_setup
-            if p["op"] in OPS
-            else {"batch": run_batch, "book": run_book}.get(p["op"], run_job)
+            {"batch": run_batch, "book": run_book}.get(p["op"], run_job)
         )(p, track, cfg, keys, self.persist)
         output = (
             result

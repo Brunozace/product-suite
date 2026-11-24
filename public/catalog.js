@@ -35,15 +35,6 @@ export const channels = {
     "https://refer.instantly.ai/ty0wj6t5f0pi",
   ],
   Whop: ["Hosts your store and checkout", "https://whop.com/sell"],
-  "Nano Banana": [
-    "Optional Gemini image key",
-    "https://aistudio.google.com/apikey",
-  ],
-  Spaceship: ["Manages sending domains and DNS", "https://www.spaceship.com"],
-  ScaledMail: [
-    "Provides sending inboxes",
-    "https://go.scaledmail.com/jordan-rafealov",
-  ],
 };
 const step = (name, action, desc, tool, job, cost, time) => ({
   name,
@@ -149,11 +140,11 @@ export const sections = {
       step(
         "Set up inboxes",
         "Review inbox setup",
-        "Use dedicated sending domains and keep each campaign separate.",
-        "Spaceship|ScaledMail|Instantly",
+        "Check the sending accounts and warmup status in your Instantly workspace.",
+        "Instantly",
         "Inbox setup",
-        "$7/mo est.",
-        "14 day warmup",
+        "Instantly subscription",
+        "Account check",
       ),
       step(
         "Write the emails",

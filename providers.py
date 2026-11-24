@@ -30,18 +30,12 @@ HOSTS = {
     "Higgsfield": "https://api.higgsfield.ai",
     "Instantly": "https://api.instantly.ai/api/v2",
     "Whop": "https://api.whop.com/api/v1",
-    "Nano Banana": "https://generativelanguage.googleapis.com/v1beta",
-    "Spaceship": "https://spaceship.dev/api/v1",
-    "ScaledMail": "https://server.scaledmail.com/api/v1",
 }
 READS = {
     "OpenAI": "/models",
     "Apify": "/users/me",
     "Instantly": "/accounts?limit=1",
     "Whop": "/products?first=1",
-    "Nano Banana": "/models?pageSize=1",
-    "Spaceship": "/domains?take=1&skip=0",
-    "ScaledMail": "/organizations",
 }
 PROVIDER = {
     "robot": "Apify",
@@ -52,8 +46,6 @@ PROVIDER = {
     "hidden": "Whop",
     "publish": "Whop",
     "hide": "Whop",
-    "domains": "Spaceship",
-    "workspaces": "ScaledMail",
     **dict.fromkeys(
         (
             "inboxes",
@@ -102,12 +94,6 @@ def send(name, url, headers, method="GET", payload=None):
                 "Provider result too large. Lower the result limit.",
             )
             result = json.loads(raw) if raw.strip() else {}
-            if (
-                name == "Spaceship"
-                and r.headers.get("spaceship-async-operationid")
-                and isinstance(result, dict)
-            ):
-                result["operationId"] = r.headers["spaceship-async-operationid"]
             return result
     except HTTPError as err:
         raise ProviderError(name, err.code) from None
@@ -124,10 +110,6 @@ def request(keys, name, path, method="GET", body=None, extra=None):
     headers = {"Authorization": "Bearer " + key}
     if name == "Instantly":
         headers["User-Agent"] = "Dearwork/1.0"
-    if name == "Spaceship":
-        headers = {"X-API-Key": key, "X-API-Secret": v["secret"]}
-    if name == "Nano Banana":
-        headers = {"x-goog-api-key": key}
     if name == "Higgsfield":
         credential = key + ":" + v["secret"] if v.get("secret") else key
         headers = {"Authorization": "Key " + credential}
@@ -661,19 +643,9 @@ def run_job(p, t, cfg, keys, persist):
             call("/products/" + t["productId"], "PATCH", {"visibility": vis})
         t["visible"] = show
         return {"visibility": vis, "stock": p["stock"] if show else 0}
-    if op in ("inboxes", "domains", "workspaces"):
-        a = call(
-            {
-                "inboxes": "/accounts?limit=100",
-                "domains": "/domains?take=100&skip=0",
-                "workspaces": "/organizations",
-            }[op]
-        )
-        rows = (
-            a
-            if isinstance(a, list)
-            else a.get("items", a.get("data", a.get("organizations", [])))
-        )
+    if op == "inboxes":
+        response = call("/accounts?limit=100")
+        rows = response if isinstance(response, list) else response.get("items", [])
         return [
             {
                 k: r[k]

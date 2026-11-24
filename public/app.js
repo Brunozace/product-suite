@@ -235,7 +235,7 @@ function rail() {
         "Searches and runs",
       ],
     ],
-  )}<div class="sectionhead"><span class="label">Recent activity</span>${icon("clock")}</div>${events.length ? events.map(([g, n, desc, time], i) => `<div class="event"><span class="ibox ${["", "greenbox", "", "orangebox"][i % 4]}">${icon(g)}</span><div><b>${e(n)}</b><small>${e(desc)}</small><time>${e(time)}</time></div></div>`).join("") : '<p class="small">Your first confirmed action will appear here.</p>'}<details><summary>Tools connected <small class="dim">${demo ? "9" : Object.values(live.keys).filter((k) => k.status === "Connected").length} / 9</small></summary>${Object.keys(
+  )}<div class="sectionhead"><span class="label">Recent activity</span>${icon("clock")}</div>${events.length ? events.map(([g, n, desc, time], i) => `<div class="event"><span class="ibox ${["", "greenbox", "", "orangebox"][i % 4]}">${icon(g)}</span><div><b>${e(n)}</b><small>${e(desc)}</small><time>${e(time)}</time></div></div>`).join("") : '<p class="small">Your first confirmed action will appear here.</p>'}<details><summary>Tools connected <small class="dim">${demo ? Object.keys(channels).length : Object.keys(channels).filter((k) => live.keys[k]?.status === "Connected").length} / ${Object.keys(channels).length}</small></summary>${Object.keys(
     channels,
   )
     .map(
@@ -676,11 +676,6 @@ function capture() {
     followBody: val("follow-body"),
     outline: val("book-outline"),
     platform: val("live-platform"),
-    brand: val("domain-brand"),
-    domain: val("dedicated-domain"),
-    firstName: val("first-name"),
-    lastName: val("last-name"),
-    dns: val("mail-dns"),
     track: C.t,
     step: screen + "-" + idx,
     instruction:
@@ -883,29 +878,6 @@ async function action(a, v, el) {
       if (fn) await fn();
       break;
     }
-    case "registrar":
-      if (demo) {
-        toast("Switch to Live to save a private login.");
-        break;
-      }
-      modal(
-        "Private registrar login",
-        field("Registrar username", "reg-user") +
-          field("Registrar password", "reg-pass", "", "password") +
-          b("Save privately", "savereg", "", "primary") +
-          b("Remove", "removekey", "Registrar"),
-      );
-      break;
-    case "savereg":
-      await api("key", {
-        name: "Registrar",
-        key: val("reg-user"),
-        secret: val("reg-pass"),
-      });
-      await refresh();
-      close();
-      toast("Private login saved.");
-      break;
     case "key":
       missingKey(v);
       break;
@@ -914,7 +886,7 @@ async function action(a, v, el) {
       missingKey(v);
       break;
     case "savekey": {
-      await api("key", { name: v, key: val("secret"), secret: val("secret2") });
+      await api("key", { name: v, key: val("secret") });
       await refresh();
       missingKey(v);
       render();
@@ -1193,53 +1165,6 @@ async function action(a, v, el) {
         "application/json",
       );
       break;
-    case "inboxmode":
-      d.existing = v === "existing";
-      save();
-      render();
-      break;
-    case "inboxstage":
-      d.inboxStage = j;
-      save();
-      render();
-      break;
-    case "inboxconfirm": {
-      let n = Array.from({ length: 6 }, (_, i) => d.doms?.[i] !== false).filter(
-        Boolean,
-      ).length;
-      confirmBox(
-        "Review setup simulation",
-        [
-          "Check " +
-            n +
-            " selected domains. Annual example total $" +
-            n * 11 +
-            " est.",
-          "Create two example inboxes per selected domain.",
-          "Write the four example DNS records.",
-          "Connect inboxes with a 25 email daily cap.",
-        ][j],
-        "$0 · demo",
-        () => {
-          d.inboxStage = Math.min(j + 1, 3);
-          log("Inbox setup reviewed", offers[C.t]);
-          save();
-          render();
-        },
-      );
-      break;
-    }
-    case "importmail": {
-      let m =
-        val("importmail").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ||
-        [];
-      if (!m.length) throw Error("Paste at least one email address.");
-      d.imported = [...new Set(m)];
-      save();
-      render();
-      toast(m.length + " inboxes imported.");
-      break;
-    }
     case "mailtab":
       saveMail();
       d.mailTab = j;
@@ -1483,13 +1408,6 @@ document.addEventListener("change", async (ev) => {
     d.checks[el.dataset.check] = el.checked;
     save();
   }
-  if (el.dataset.domain !== undefined) {
-    d.doms ??= {};
-    d.doms[el.dataset.domain] = el.checked;
-    save();
-  }
-  if (el.id === "mailcsv" && el.files[0])
-    document.querySelector("#importmail").value = await el.files[0].text();
 });
 document.addEventListener("pointerover", (ev) => {
   if (ev.target.matches("video.clip") && ev.pointerType === "mouse")

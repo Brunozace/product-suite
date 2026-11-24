@@ -110,78 +110,13 @@ export function campaignView(C) {
         ]),
       ),
     );
-  if (i === 2) {
-    const stage = d.inboxStage || 0,
-      dom = Array.from({ length: 6 }, (_, j) => domain(t, j));
-    return (
-      card(
-        "Sending accounts",
-        row(
-          b("Buy new", "inboxmode", "new", !d.existing ? "chosen" : ""),
-          b(
-            "Use inboxes I have",
-            "inboxmode",
-            "existing",
-            d.existing ? "chosen" : "",
-          ),
-        ) +
-          (d.existing
-            ? field(
-                "One business inbox per line or CSV",
-                "importmail",
-                (d.imported || []).join("\n"),
-                "area",
-              ) +
-              '<input type="file" id="mailcsv" accept=".csv,text/csv">' +
-              b("Import inbox list", "importmail")
-            : `<div class="chips">${["Pick domains", "Make inboxes", "Connect DNS", "Add to Instantly"].map((v, j) => b(v, "inboxstage", j, stage === j ? "chosen" : "")).join("")}</div>${
-                stage === 0
-                  ? table(
-                      ["Select", "Domain (demo)", "Annual price"],
-                      dom.map((v, j) => [
-                        `<input type="checkbox" data-domain="${j}" ${d.doms?.[j] === false ? "" : "checked"}>`,
-                        v,
-                        "$11 est.",
-                      ]),
-                    )
-                  : stage === 1
-                    ? list(
-                        dom.map(
-                          (v) => "Alex and Sam (demo) · " + v + " · $7/mo est.",
-                        ),
-                      )
-                    : stage === 2
-                      ? table(
-                          ["Record", "Purpose", "Status"],
-                          [
-                            ["MX", "Gets your mail", "Verified (demo)"],
-                            ["SPF", "Lets Google send", "Verified (demo)"],
-                            ["DMARC", "Rules for fake mail", "Verified (demo)"],
-                            ["DKIM", "Proves it is you", "Verified (demo)"],
-                          ],
-                        )
-                      : "<p>Skip inboxes already connected. Keep warmup on. Daily limit: 25 emails per inbox.</p>"
-              }${b(["Review domain order", "Review inbox order", "Review DNS records", "Review account import"][stage], "inboxconfirm", stage)}`),
-      ) +
-      card(
-        "Warmup board",
-        stats([
-          [6, "Domains (demo)"],
-          [12, "Inboxes"],
-          [300, "Daily cap after warmup"],
-        ]) +
-          table(
-            ["Domain", "Inboxes", "DNS", "Warmup"],
-            dom.map((v, j) => [
-              v,
-              2,
-              badge("Verified", "green"),
-              "Day " + (8 + j) + " of 14",
-            ]),
-          ),
-      )
+  if (i === 2)
+    return card(
+      "Instantly AirMail inboxes (demo)",
+      table(["Sender", "Account", "Warmup"], ["alex", "sam"].map(name => [
+        name + "@" + domain(t, 0), "Active (demo)", "On (demo)",
+      ])),
     );
-  }
   if (i === 3) {
     const [sub, body] = mail(C);
     return (

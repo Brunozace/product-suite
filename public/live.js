@@ -25,8 +25,6 @@ export const configFields = {
   robotCap: "Cap per robot run ($)",
   fable: "Fable / Hermes loopback address",
   company: "Whop account ID",
-  workspace: "ScaledMail workspace",
-  owner: "Spaceship contact ID",
   name: "Your full sender name",
   business: "Business name",
   address: "Business mailing address",
@@ -63,8 +61,7 @@ function modelSelect(id, current, inherit = false) {
   );
 }
 export function keyFields(n, track, step) {
-  let item = live.keys[n] || {},
-    dual = n === "Spaceship";
+  const item = live.keys[n] || {};
   return card(
     n,
     row(
@@ -74,8 +71,7 @@ export function keyFields(n, track, step) {
       ),
       e(item.mask || ""),
     ) +
-      field(dual ? "Key ID" : "New API key", "secret", "", "password") +
-      (dual ? field("Secret", "secret2", "", "password") : "") +
+      field("New API key", "secret", "", "password") +
       row(
         b("Save key", "savekey", n, "primary"),
         b(n === "Higgsfield" ? "Save & test (free)" : "Test (free)", "testkey", n),
@@ -97,15 +93,20 @@ export function keyFields(n, track, step) {
 }
 export function settingsView(C) {
   return (
-    `<div class="stepshead"><span class="eyebrow">Workspace settings</span><h1>Settings and keys</h1><p>Paste a key once. Every step can use it through your local helper.</p></div>` +
+    `<div class="stepshead"><span class="eyebrow">Workspace settings</span><h1>Settings and keys</h1><p>Connect a service when you need its feature. Product creation and draft preparation can start during inbox warmup.</p></div>` +
     card(
-      "Connections",
-      Object.entries(channels)
+      "Workflow connections",
+      Object.entries(channels).filter(([name]) => name !== "Higgsfield")
         .map(
           ([n, [desc]]) =>
             `<div class="listline spread"><div><b>${n}</b><p>${e(desc)}</p><small class="mono">${C.demo ? "demo••••" + n.slice(0, 2).toLowerCase() : e(live.keys[n]?.mask || "")}</small></div><div>${badge(C.demo ? "Demo connection" : live.keys[n]?.status || "Not added", C.demo ? "violet" : "")} ${b(C.demo ? "Use my real key" : "Manage", "key", n)}</div></div>`,
         )
         .join(""),
+    ) +
+    card(
+      "Optional media",
+      "<p>Generate photos and video clips with Higgsfield.</p>" +
+        row(badge(C.demo ? "Demo connection" : live.keys.Higgsfield?.status || "Not added"), b("Manage Higgsfield", "key", "Higgsfield")),
     ) +
     card(
       "Writing model",
@@ -127,20 +128,6 @@ export function settingsView(C) {
         .join("")}</div>${b("Save settings", "saveconfig")}`,
     ) +
     card(
-      "Private registrar login",
-      "<p>Only used in a ScaledMail order you confirm. Stored with your other credentials.</p>" +
-        b("Manage registrar login", "registrar"),
-    ) +
-    card(
-      "Tools and partners",
-      row(
-        ...Object.entries(channels).map(([n, a]) => link(n, a[1])),
-        link("Zernio", "https://zernio.link/jordan-rafealov"),
-        link("Wispr Flow", "https://ref.wisprflow.ai/jordan-rafealov-tvka"),
-      ) +
-        "<p>Partner links may pay the person who shared this app. Same price for you. Apify code: 25JORDAN.</p>",
-    ) +
-    card(
       "Research robots",
       "<p>Live runs use the current pricing model returned by Apify. Enter the pay-per-event actor and input on the research step. The helper reserves the full run cap.</p>",
     ) +
@@ -155,17 +142,7 @@ const operations = (C) => {
     return [
       ["batch", "robot"],
       ["verify"],
-      [
-        "availability",
-        "register",
-        "orderMail",
-        "writeDNS",
-        "readDNS",
-        "connectMail",
-        "inboxes",
-        "domains",
-        "workspaces",
-      ],
+      ["inboxes"],
       ["write", "campaign", "leads", "test", "activate"],
       ["analytics", "pause", "activate"],
       ["replies", "write"],
@@ -190,12 +167,6 @@ const operations = (C) => {
 export const opNames = {
   batch: "Research public sources",
   book: "Write the product",
-  availability: "Check six domain names",
-  register: "Review domain purchase",
-  orderMail: "Review inbox subscription",
-  writeDNS: "Review DNS changes",
-  readDNS: "Check DNS records",
-  connectMail: "Connect and warm inboxes",
   mediaStatus: "Check media job",
   note: "Save workspace notes",
   write: "Generate draft",
@@ -212,8 +183,6 @@ export const opNames = {
   pause: "Pause sending",
   replies: "Read campaign replies",
   inboxes: "List sending inboxes",
-  domains: "List sending domains",
-  workspaces: "List mail workspaces",
   media: "Create sample media",
   payreply: "Send payment reply",
   localphoto: "Measure photo",
@@ -336,27 +305,6 @@ export function liveView(C) {
       ),
       "<p>The helper requests a provider estimate for these exact settings before confirmation.</p>",
     );
-  if (o.includes("inboxes"))
-    forms.push(
-      field(
-        "Business name for six suggestions",
-        "domain-brand",
-        live.config.business || "Dearwork",
-      ),
-      field(
-        "Dedicated domain to check or order",
-        "dedicated-domain",
-        track.domain || "",
-      ),
-      field("Sender first name", "first-name"),
-      field("Sender last name", "last-name"),
-      field(
-        "MX and TXT records from your provider (JSON array)",
-        "mail-dns",
-        "[]",
-        "area",
-      ),
-    );
   if (o.includes("localphoto"))
     forms.push(
       '<label class="field">Photo to measure<input type="file" accept="image/*" id="photo-input"></label>',
@@ -453,13 +401,9 @@ export function liveView(C) {
     : "";
   const extras = o.includes("inboxes")
     ? card(
-        "Domain and mailbox setup",
-        "<p>Check six names, review one purchase, then order two inboxes for that domain. Add the DNS records from your mail provider and check them before enabling warmup.</p>" +
-          row(
-            link("Spaceship", channels.Spaceship[1]),
-            link("ScaledMail", channels.ScaledMail[1]),
-            link("Instantly", channels.Instantly[1]),
-          ),
+        "Instantly AirMail",
+        "<p>List your existing sending accounts to check their status. You can research creators, write emails and prepare a paused campaign now. Before sending outreach, confirm the sending domain is at least one month old and the inbox has completed warmup.</p>" +
+          link("Instantly sending policy", "https://instantly.ai/instantly-sending-policy"),
       )
     : "";
   return (
