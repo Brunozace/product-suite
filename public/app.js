@@ -704,6 +704,7 @@ function capture() {
 }
 async function liveAction(op, retry = "") {
   let p = capture();
+  const onOriginalStep = () => !demo && state().t === p.track && screen + "-" + idx === p.step;
   p.retry = retry;
   if (op === "localphoto") {
     let file = document.querySelector("#photo-input")?.files[0];
@@ -740,12 +741,27 @@ async function liveAction(op, retry = "") {
     toast("Saved locally.");
     return;
   }
-  let q = await api("quote", { ...p, op });
+  const status = document.querySelector("#request-status");
+  status.textContent = "Preparing the cost estimate for " + opNames[op] + "…";
+  let q;
+  try {
+    q = await api("quote", { ...p, op });
+  } finally {
+    status.textContent = "";
+  }
+  if (!onOriginalStep()) return;
   confirmBox(opNames[op], q.description, q.price, async () => {
-    await api("run", { ticket: q.ticket, confirmed: true });
-    await refresh();
-    render();
-    toast("Result saved.");
+    status.textContent = op === "discover"
+      ? "Finding and ranking product ideas. You can browse other steps while this runs."
+      : opNames[op] + " is running. You can browse other steps.";
+    try {
+      await api("run", { ticket: q.ticket, confirmed: true });
+      await refresh();
+      if (onOriginalStep()) render();
+      toast(op === "discover" ? "Ideas saved in " + p.track + " → Your idea." : "Result saved.");
+    } finally {
+      status.textContent = "";
+    }
   });
 }
 async function pdf(down, liveBook = false) {
@@ -1366,8 +1382,13 @@ async function action(a, v, el) {
 }
 document.addEventListener("click", async (ev) => {
   let el = ev.target.closest("[data-act]");
-  if (!el || working) return;
-  working = true;
+  if (!el) return;
+  const navigation = ["nav", "step", "next", "menu", "rail", "theme"].includes(el.dataset.act);
+  if (working && !navigation) {
+    toast("An action is already in progress. You can still browse the workspace.");
+    return;
+  }
+  if (!navigation) working = true;
   el.disabled = true;
   try {
     await action(el.dataset.act, el.dataset.v, el);
@@ -1384,7 +1405,7 @@ document.addEventListener("click", async (ev) => {
       render();
     }
   } finally {
-    working = false;
+    if (!navigation) working = false;
     el.disabled = false;
   }
 });

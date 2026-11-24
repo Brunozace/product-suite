@@ -1262,7 +1262,7 @@ dialog .spread {
 dialog h2 {
   font-size: 23px;
 }
-#toast {
+#toast, #request-status {
   position: fixed;
   bottom: 22px;
   left: 50%;
@@ -1277,6 +1277,12 @@ dialog h2 {
 }
 #toast.show {
   display: block;
+}
+#request-status:not(:empty) {
+  display: block;
+  bottom: auto;
+  top: 12px;
+  pointer-events: none;
 }
 .player {
   position: fixed;
