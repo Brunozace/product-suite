@@ -1705,6 +1705,17 @@ pre {
   grid-template-columns: minmax(0, 3fr) minmax(160px, 2fr);
   gap: 24px;
 }
+.studio-head .actions { justify-content: flex-end; }
+.reader-layout { display:grid; grid-template-columns:minmax(160px, 1fr) minmax(0, 3fr); gap:20px; align-items:start; }
+.reader-layout aside nav { display:grid; gap:5px; margin-top:15px; }
+.reader-layout aside nav button { text-align:left; white-space:normal; }
+.studio-cover { display:grid; align-content:space-between; gap:28px; min-height:190px; padding:22px; border-radius:5px 14px 14px 5px; color:#322644; background:linear-gradient(120deg,#efe9d9,#e5dcf7); border-inline-start:6px solid #a99bb7; }
+.studio-cover strong { font:600 clamp(1rem,1.6vw,1.7rem)/1.15 Georgia,serif; overflow-wrap:anywhere; }
+.studio-paper { min-height:360px; padding:clamp(22px,4vw,52px); border:1px solid #d6cebf; background:#fffdf7; color:#2a2625; border-radius:8px; box-shadow:0 6px 22px #0001; }
+.studio-paper p { color:#373031; font:1.06rem/1.75 Georgia,serif; }
+.studio-paper h2 { font-family:Georgia,serif; }
+.practice-row { display:block; padding:8px 4px; border-bottom:1px solid #b8b0a5; font:2rem/1.5 Arial,sans-serif; color:#aaa; }
+@media (max-width:760px) { .reader-layout { grid-template-columns:1fr; } .reader-layout aside nav { max-height:160px; overflow:auto; } }
 .buyer-layout .bar { margin: 3px 0 8px; }
 .card.buyer-selected { border-color: var(--accent, #946aff); }
 @media (max-width: 700px) {

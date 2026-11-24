@@ -114,6 +114,24 @@ class Document:
         )
         return bytes(data)
 
+    def practice(self, value):
+        if self.y < 112:
+            self.flush()
+        y = self.y - 37
+        self.command(f"q 0.80 G 0.6 w 37 {y-4} m 394 {y-4} l S Q")
+        if value in ("circle", "triangle", "square", "line"):
+            for x in (48, 135, 222, 309):
+                paths = {
+                    "square": "0 0 29 29 re",
+                    "triangle": "0 0 m 15 29 l 30 0 l h",
+                    "line": "0 0 m 48 26 l",
+                    "circle": "15 0 m 35 0 35 30 15 30 c -5 30 -5 0 15 0 c",
+                }
+                self.command(f"q 1 0 0 1 {x} {y} cm 0.55 G [2 2] 0 d {paths[value]} S Q")
+        elif value:
+            self.text(value, y, 28, 0, 43, "0.70 0.70 0.70")
+        self.y -= 63
+
 
 def render_pdf(payload):
     title = str(payload["title"])[:120]
@@ -123,13 +141,15 @@ def render_pdf(payload):
         raise ValueError("Book is too large.")
     doc = Document()
     doc.command("0.94 0.92 0.85 rg 0 0 432 648 re f")
-    doc.text("THE KITCHEN FIELD GUIDE", 580, 11, 1)
+    live = payload.get("liveProduct") is True
+    doc.text(payload.get("format", "Book").upper() if live else "THE KITCHEN FIELD GUIDE", 580, 11, 1)
     y = 517
     for part in textwrap.wrap(title, 20):
         doc.text(part, y, 34, 2)
         y -= 40
-    doc.photo_band(115, 222)
-    doc.text("General information, not medical advice.", 78, 10)
+    if not live:
+        doc.photo_band(115, 222)
+        doc.text("General information, not medical advice.", 78, 10)
     doc.flush()
     doc.text("Contents", 576, 32, 2)
     doc.y = 530
@@ -143,11 +163,12 @@ def render_pdf(payload):
         for line in textwrap.wrap(str(unit["title"]), 30):
             doc.text(line, doc.y, 24, 2)
             doc.y -= 29
-        doc.photo_band(doc.y - 67, 58)
-        doc.y -= 90
+        if not live:
+            doc.photo_band(doc.y - 67, 58)
+            doc.y -= 90
         for i, part in enumerate(str(unit["text"]).split("\n\n")):
             chunks = part.splitlines()
-            if i == 0:
+            if i == 0 and not live:
                 doc.para("THE SHORT VERSION", 10, True)
             if chunks and chunks[0] in (
                 "Remember",
@@ -159,6 +180,10 @@ def render_pdf(payload):
                     doc.flush()
                 doc.command(f"0.89 0.91 0.83 rg 31 {doc.y - 5} 370 18 re f")
             for k, line in enumerate(chunks):
+                practice = re.fullmatch(r"\[(?:TRACE: ([^\[\]]{1,20})|WRITE)\]", line.strip())
+                if live and practice:
+                    doc.practice(practice[1] or "")
+                    continue
                 doc.para(line, 11, k == 0 and len(chunks) > 1)
         doc.flush()
     doc.text("Source notes", 575, 30, 2)

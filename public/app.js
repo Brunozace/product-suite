@@ -41,6 +41,7 @@ import { sources, units } from "./book.js";
 import { productView, chapterText, kit, kitTabs } from "./product.js";
 import { campaignView, replyView } from "./campaign.js";
 import { planningView } from "./planning.js";
+import { studio, selectChapter } from "./studio.js";
 import { serviceView, pkg, filesFor } from "./services.js";
 import {
   live,
@@ -327,6 +328,10 @@ function services() {
   );
 }
 function stepPage() {
+  if (!demo) {
+    const view = studio(state(), live.tracks[state().t] || {});
+    if (view) return view;
+  }
   if (!demo && screen === "build" && (idx === 2 || idx === 3))
     return planningView(state(), live.tracks[state().t] || {});
   let C = state(),
@@ -783,6 +788,7 @@ async function pdf(down, liveBook = false) {
     body = {
       format: C.f,
       title: bk.title,
+      liveProduct: true,
       sources: bk.sources,
       units: Object.entries(bk.units).map(([i, text]) => ({
         title: bk.titles[i],
@@ -1050,6 +1056,17 @@ async function action(a, v, el) {
         );
       break;
     }
+    case "readchapter":
+      selectChapter(C.t, j);
+      render();
+      break;
+    case "pickcreator":
+    case "offerprice":
+      await api(a, {track:C.t, step:screen+"-"+idx, creator:v, price:val("live-price")});
+      await refresh();
+      render();
+      toast(a === "pickcreator" ? "Creator selected for research." : "Offer price saved.");
+      break;
     case "pickbuyer":
       await api("pickbuyer", {track: C.t, step: "build-2", buyer: v});
       await refresh();

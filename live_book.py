@@ -29,6 +29,13 @@ def quote_book(p, t, cfg, keys):
             "Course": "Write a spoken lesson script, a clear demonstration, one practice task, and a printable one-page worksheet.",
             "Coaching": "Write a week plan, call outline, practice assignment and printable check-in form.",
         }[p["track"]]
+        if p["track"] == "Ebook" and re.search(r"\b(workbook|worksheet|printable)\b", p["title"], re.I):
+            prompt = ("Create the actual printable activity for this unit. Give short learner or caregiver "
+                      "directions, a worked example and space to practice. Match the age and the outline. "
+                      "For handwriting exercises place each practice row on its own line as "
+                      "[TRACE: A a] or [TRACE: 1 2 3]. For shape or path exercises use [TRACE: circle], "
+                      "[TRACE: triangle], [TRACE: square] or [TRACE: line]. Use [WRITE] for a blank practice row. "
+                      "Use only the rows this activity needs. Cite factual claims using supplied sources.")
         source_index = "\n".join(f"[{j + 1}] {u}" for j, u in enumerate(urls))
         job = {
             **p,

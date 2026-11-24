@@ -149,7 +149,7 @@ def make_jobs(p, t):
             (
                 "Recent work",
                 "apify~instagram-reel-scraper",
-                {"username": ["derived from matching creators"], "resultsLimit": 3},
+                {"username": ["derived from matching creators"], "resultsLimit": 8},
             ),
         ]
     return jobs
@@ -190,12 +190,22 @@ def quote_batch(p, t, cfg, keys):
 
 
 def run_batch(p, t, cfg, keys, persist):
+    if p["step"] == "outreach-0":
+        t.setdefault("research", {})[p["step"]] = {}
+        t["searchPlatform"] = p.get("platform") or "Instagram"
+    if p["step"] == "build-5":
+        handle = p["notes"].strip().lstrip("@")
+        if handle.lower() != t.get("voiceHandle", "").lower():
+            t.setdefault("research", {})[p["step"]] = {}
+        t.update(voiceHandle=handle, voiceReport="", voiceOriginal="")
     results = t.setdefault("research", {}).setdefault(p["step"], {})
 
     def one(job):
         try:
             rows = run_job(job, {}, cfg, keys, lambda: None)
             # Keep compact source records instead of entire remote page bodies.
+            if job["actor"] == "apify~google-search-scraper":
+                rows = [hit for page in rows for hit in page.get("organicResults", [page])]
             rows = [
                 {
                     k: (v[:1600] if isinstance(v, str) else v)

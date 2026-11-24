@@ -248,6 +248,19 @@ class Workspace:
             self.tickets.clear()
             self.persist()
             return {"ok": True}
+        if route == "offerprice":
+            require(p["step"] == "build-6", "Open Ready to sell to set the price.")
+            track["price"] = amount(p["price"])
+            self.persist()
+            return {"ok": True}
+        if route == "pickcreator":
+            profiles = track.get("research", {}).get("outreach-0", {}).get("Creators", {}).get("rows", [])
+            require(p["step"] == "outreach-0" and p.get("creator") and
+                    any(r.get("username") == p["creator"] for r in profiles), "Choose a researched profile.")
+            track["creator"] = p["creator"]
+            track["creatorProfile"] = next(r for r in profiles if r.get("username") == p["creator"])
+            self.persist()
+            return {"ok": True}
         if route == "pickbuyer":
             buyer = p.get("buyer")
             require(p["step"] == "build-2" and isinstance(buyer, str) and buyer
@@ -294,6 +307,31 @@ class Workspace:
                 )
             if p["op"] == "write" and p["step"] == "build-3" and track.get("buyer"):
                 p["instruction"] += "\nDesign this plan specifically for the selected buyer: " + track["buyer"]
+            if p["op"] == "write" and p["step"] == "build-5":
+                research = track.get("research", {}).get("build-5", {})
+                handle = p["notes"].strip().lstrip("@").lower()
+                posts = research.get("Recent reels", {}).get("rows", [])
+                require(posts and handle == track.get("voiceHandle", track.get("notes", {}).get("build-5", "")).lstrip("@").lower(),
+                        "Read public posts for this handle before analyzing the voice.")
+                p["original"] = track.get("book", {}).get("units", {}).get("0", "")[:1600]
+                excerpts = [{"caption": str(r.get("caption", ""))[:450], "url": r.get("url")} for r in posts[:15]]
+                p["instruction"] = ("Analyze only the following creator posts. Give sections for voice traits, "
+                    "recurring phrases, audience needs and topic counts. Link observations to supplied posts. "
+                    "Use a final heading '## Adapted excerpt' for a sample revision of the supplied original, "
+                    "preserving factual claims and citations. If no original exists, omit the sample. "
+                    "Never invent personal experiences or endorsements. Posts: " + json.dumps(excerpts) +
+                    " Original: " + p["original"])
+            if p["op"] == "write" and p["step"] == "build-6":
+                book = track.get("book", {})
+                offer = {
+                    "buyer": track.get("buyer"),
+                    "price_usd": track.get("price"),
+                    "completed_units": [book["titles"][int(i)] for i in book.get("units", {})],
+                    "sample": book.get("units", {}).get("0", "")[:1200],
+                    "plan": track.get("results", {}).get("build-3", "")[:2500],
+                }
+                p["instruction"] += (" Use the product details below. Distinguish planned material from finished "
+                                     "deliverables and use the saved price when present. " + json.dumps(offer))
             cost, description = (
                 {"batch": quote_batch, "book": quote_book, "discover": quote_discovery}.get(p["op"], quote_job)
             )(p, track, cfg, keys)
@@ -340,6 +378,8 @@ class Workspace:
             else json.dumps(result, indent=2, ensure_ascii=False)
         )
         if p["op"] != "discover":
+            if p["op"] == "write" and p["step"] == "build-5":
+                track.update(voiceReport=output, voiceOriginal=p["original"])
             if p["op"] == "write" and p["step"] == "build-3":
                 track["planBuyer"] = track.get("buyer", "")
             track["results"][p["step"]] = output[:300000]

@@ -29,6 +29,7 @@ Switch to **Live**, open **Settings**, and save the keys for the providers you i
 
 | Workflow | Available in Live |
 | --- | --- |
+| Product and creator review | Read and edit individual manuscript units, preview the live PDF, and review linked market evidence. The Instagram shortlist compares profiles with observed views, follower counts, bio offers and public contact details. Pick a creator, read their recent posts and review an evidence-linked voice analysis alongside a sample rewrite. Save the offer price before opening the Whop setup. |
 | Idea discovery | Start in **Build it → Your idea → Find me an idea** with an empty workspace. Review one quote for an Apify search across six sites and an OpenAI ranking. Inspect the linked evidence, then choose **Use this idea** to carry it into market research. You can also enter an idea yourself for free. |
 | Market research | Preconfigured public-source research for Reddit, Amazon, Etsy, TikTok and YouTube. Each pay-per-event actor gets a separate hard cap. Independent jobs run concurrently and successful results survive individual failures. Inspect source records before using them. |
 | Products | Use reviewed research to draft the plan. Review or enter an outline and source material, generate units sequentially, edit the saved text and export a PDF. Generation checkpoints each unit. Use linked sources you have actually read. |
