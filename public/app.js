@@ -40,6 +40,7 @@ import {
 import { sources, units } from "./book.js";
 import { productView, chapterText, kit, kitTabs } from "./product.js";
 import { campaignView, replyView } from "./campaign.js";
+import { planningView } from "./planning.js";
 import { serviceView, pkg, filesFor } from "./services.js";
 import {
   live,
@@ -326,6 +327,8 @@ function services() {
   );
 }
 function stepPage() {
+  if (!demo && screen === "build" && (idx === 2 || idx === 3))
+    return planningView(state(), live.tracks[state().t] || {});
   let C = state(),
     all = steps(screen, C.f, C.h),
     st = all[idx],
@@ -649,9 +652,9 @@ const specs = {
   "build-1":
     "Return buyer quotations with source URLs, listings with prices, review counts and a market summary. Separate unavailable data.",
   "build-2":
-    "Score five narrow buyer groups on lasting need, ease, repeatability, repeat purchases and competition. Give scores out of five, evidence and a total out of 25.",
+    "Return five narrow groups in a Markdown table with these columns in order: Buyer group, Lasting need, Ease, Repeatability, Repeat purchases, Room to compete, Total, Evidence. Use integers from 1 to 5 (higher is better), total out of 25, and a source-linked rationale per row.",
   "build-3":
-    "Provide title, subtitle, promise, before/after, four milestones, bonuses and price rationale. Give a numbered outline of ten ebook chapters, six course lessons or four coaching weeks depending on format.",
+    "Provide title, subtitle, a ## Promise section, a Before | After Markdown table, four milestones, bonuses and price rationale. Include a ## Outline section with numbered titles, one per line, for ten ebook chapters, six course lessons or four coaching weeks depending on format.",
   "build-5":
     "Ground voice traits in exact public posts and links. Rewrite only reviewed content and preserve source numbers.",
   "build-6":
@@ -1047,6 +1050,12 @@ async function action(a, v, el) {
         );
       break;
     }
+    case "pickbuyer":
+      await api("pickbuyer", {track: C.t, step: "build-2", buyer: v});
+      await refresh();
+      render();
+      toast("Buyer selected for your product plan.");
+      break;
     case "useidea": {
       const idea = live.tracks[C.t]?.ideas?.[j];
       if (!idea) throw Error("Choose a saved idea.");

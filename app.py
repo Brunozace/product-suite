@@ -248,6 +248,15 @@ class Workspace:
             self.tickets.clear()
             self.persist()
             return {"ok": True}
+        if route == "pickbuyer":
+            buyer = p.get("buyer")
+            require(p["step"] == "build-2" and isinstance(buyer, str) and buyer
+                    and buyer in track["results"].get("build-2", "").replace("**", "").replace("__", ""),
+                    "Choose a group from the saved buyer analysis.")
+            track["buyer"] = buyer
+            self.tickets.clear()
+            self.persist()
+            return {"ok": True}
         if route == "note":
             if p["step"] == "build-0" and "ideaIndex" in p:
                 ideas = track.get("ideas", [])
@@ -283,6 +292,8 @@ class Workspace:
                     ),
                     "Use a dedicated sending inbox for this track.",
                 )
+            if p["op"] == "write" and p["step"] == "build-3" and track.get("buyer"):
+                p["instruction"] += "\nDesign this plan specifically for the selected buyer: " + track["buyer"]
             cost, description = (
                 {"batch": quote_batch, "book": quote_book, "discover": quote_discovery}.get(p["op"], quote_job)
             )(p, track, cfg, keys)
@@ -329,6 +340,8 @@ class Workspace:
             else json.dumps(result, indent=2, ensure_ascii=False)
         )
         if p["op"] != "discover":
+            if p["op"] == "write" and p["step"] == "build-3":
+                track["planBuyer"] = track.get("buyer", "")
             track["results"][p["step"]] = output[:300000]
             track["notes"][p["step"]] = p.get("notes", "")
             if p.get("title"):

@@ -1,5 +1,6 @@
 import { e, b, row, field, card, grid, select, link, badge } from "./ui.js";
 import { channels, offers } from "./catalog.js";
+import { planOutline } from "./planning.js";
 export let live = { keys: {}, config: {}, tracks: {}, reserved: 0 };
 let token = "";
 export async function api(route, body) {
@@ -225,6 +226,7 @@ export function liveView(C) {
       "Brief, source notes or reply to draft",
       "live-notes",
       track.notes?.[id] ||
+        (o.includes("book") ? track.results?.["build-3"] : "") ||
         (C.s === "build" && C.i === 1 ? track.notes?.["build-0"] : "") ||
         "",
       "area",
@@ -237,11 +239,7 @@ export function liveView(C) {
         "book-outline",
         (
           track.book?.titles ||
-          (
-            (track.results?.["build-3"] || "").match(
-              /^\s*(?:\d+[.)]|(?:Chapter|Lesson|Week) \d+[:.])\s+.+$/gim,
-            ) || []
-          ).slice(0, 20)
+          planOutline(track.results?.["build-3"] || "").slice(0, 20)
         ).join("\n"),
         "area",
       ),

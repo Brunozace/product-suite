@@ -1700,3 +1700,13 @@ pre {
     transition: none !important;
   }
 }
+.buyer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(160px, 2fr);
+  gap: 24px;
+}
+.buyer-layout .bar { margin: 3px 0 8px; }
+.card.buyer-selected { border-color: var(--accent, #946aff); }
+@media (max-width: 700px) {
+  .buyer-layout { grid-template-columns: 1fr; gap: 8px; }
+}
