@@ -259,18 +259,51 @@ class Sheet:
                 self.y -= height
             self.y -= 24
 
-    def content(self, page, kind, index, total):
+    def content(self, page, kind, index, total, illustration=None):
         validate(page)
+        c = self.c
+        c.setFillColor(HexColor("#f0f5ed"))
+        c.rect(0, self.h - 19, self.w, 19, stroke=0, fill=1)
+        self.stroke(TEAL, (), 2)
+        c.line(self.x, self.h - 28, self.x + 26, self.h - 28)
         self.text(kind.upper(), self.x, self.y, 9, "Helvetica-Bold", TEAL)
         self.y -= 38
-        self.paragraph(page["title"], 23, "Times-Bold")
+        if illustration:
+            width = self.width * 0.32
+            height = 96
+            top = self.h - 31
+            from PIL import Image, ImageOps
+
+            with Image.open(BytesIO(illustration)) as im:
+                panel = ImageOps.fit(im.convert("RGB"), (int(width * 3), height * 3))
+                c.drawImage(
+                    ImageReader(panel), self.right - width, top - height, width, height
+                )
+            original_width = self.width
+            self.width -= width + 16
+            self.paragraph(page["title"], 23, "Times-Bold")
+            self.width = original_width
+            self.y = min(self.y, top - height - 20)
+        else:
+            self.paragraph(page["title"], 23, "Times-Bold")
         self.y -= 10
+        start = self.y
+        # Measure the vector body once; scale only if the artwork consumed its free margin.
+        form = "body" + str(index)
+        c.beginForm(form)
         for b in page["blocks"]:
             self.draw(b)
-        if self.y < 40:
+        c.endForm()
+        scale = min(1, (start - 40) / max(1, start - self.y)) if illustration else 1
+        if scale < 0.78 or (not illustration and self.y < 40):
             raise ValueError(
                 "Content exceeds the print margins. Shorten the page or reduce the number of rows."
             )
+        c.saveState()
+        c.translate(self.x * (1 - scale), start * (1 - scale))
+        c.scale(scale, scale)
+        c.doForm(form)
+        c.restoreState()
         self.stroke(LIGHT)
         self.c.line(self.x, 32, self.right, 32)
         self.text(f"{index} / {total}", self.x, 18, 9, color=MUTED)
@@ -324,7 +357,7 @@ class Sheet:
             raise ValueError("Cover title exceeds the available print area.")
 
 
-def pdf_pages(book, art=None, only=None):
+def pdf_pages(book, art=None, only=None, illustrations=None):
     if Canvas is None:
         raise ValueError(
             "Install the print dependencies with python -m pip install -r requirements.txt."
@@ -339,7 +372,8 @@ def pdf_pages(book, art=None, only=None):
         if i == 0:
             sheet.cover(book["title"], book["subtype"], art)
         else:
-            sheet.content(book["pages"][str(i - 1)], book["subtype"], i, total)
+            image = (illustrations or {}).get(str(i - 1)) or (art if i == 1 else None)
+            sheet.content(book["pages"][str(i - 1)], book["subtype"], i, total, image)
         c.showPage()
     c.save()
     return out.getvalue()

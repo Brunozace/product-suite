@@ -33,7 +33,7 @@ def changed(track, index):
 def prepare(p, track):
     index = int(p["step"].split("-")[1])
     # Cover artwork is independent of manuscript generation.
-    if p["op"] in ("discover", "cover", "coverStatus"):
+    if p["op"] in ("discover", "cover", "coverStatus","pageArt","pageArtStatus"):
         return
     for earlier, ok in enumerate(completed(track)[:index]):
         if not ok:

@@ -45,6 +45,8 @@ PROVIDER = {
     "mediaStatus": "Higgsfield",
     "cover": "Higgsfield",
     "coverStatus": "Higgsfield",
+    "pageArt": "Higgsfield",
+    "pageArtStatus": "Higgsfield",
     "hidden": "Whop",
     "publish": "Whop",
     "hide": "Whop",
@@ -224,6 +226,15 @@ def actor_pricing(keys, actor):
     return price
 
 
+def illustration_target(p,t):
+    index=p.get("pageIndex")
+    book=t.get("book",{})
+    require(p.get("track")=="Ebook" and p.get("step")=="build-4" and type(index) is int and
+            str(index) in book.get("pages",{}), "Select a saved ebook page.")
+    require(p.get("edition")==book.get("signature"), "Refresh the reader to use the current edition.")
+    return book["pages"][str(index)], book.get("artwork",{}).get(str(index),{})
+
+
 def quote_job(p, t, cfg, keys):
     op = p["op"]
     provider = PROVIDER[op]
@@ -330,7 +341,19 @@ def quote_job(p, t, cfg, keys):
         else:
             desc += "Show previously checked profiles at no additional charge.\n"
         desc += "\n".join(urls)
-    elif op in ("media", "cover"):
+    elif op in ("media", "cover", "pageArt"):
+        if op == "pageArt":
+            from cover_art import image_tools
+            image_tools()
+            page, job = illustration_target(p,t)
+            require(not job.get("id") or job.get("status") in ("completed","failed","nsfw","canceled"), "Check the existing illustration job first.")
+            direction = str(p.get("artDirection","")).strip()[:1200]
+            require(direction, "Enter the illustration style.")
+            brief = "Illustrate this page of "+t["book"]["title"]+": "+page["title"]+". "
+            brief += " ".join(b["value"] for b in page["blocks"] if b["type"]=="paragraph")[:600]
+            prompt = brief+" Art direction: "+direction+". One clear subject. Artwork only. Omit lettering, numerals, worksheets and tracing marks."
+            p.update(modelPath="higgsfield-ai/soul/v2/standard", mediaInput=json.dumps({"prompt":prompt}), artDirection=direction)
+
         if op == "cover":
             require(p["step"] == "build-4" and p.get("coverPrompt", "").strip(), "Enter a cover art brief.")
             require(not t.get("coverId") or t.get("coverState") in ("completed","failed","nsfw","canceled"),
@@ -355,6 +378,10 @@ def quote_job(p, t, cfg, keys):
             + ". Provider estimate for these exact parameters.\n"
             + json.dumps(p["input"], indent=2)
         )
+    elif op == "pageArtStatus":
+        _, job = illustration_target(p,t)
+        require(job.get("id"), "Generate an illustration for this page first.")
+        desc += "Check the existing Higgsfield illustration job."
     elif op in ("mediaStatus", "coverStatus"):
         require(t.get("coverId" if op == "coverStatus" else "mediaId"), "Run a media job first.")
         desc += "Read current job status and output links."
@@ -589,10 +616,20 @@ def run_job(p, t, cfg, keys, persist):
             results.get(url, {"source": url, "verified": [], "result": "No result. Retry available."})
             for url in p["profiles"]
         ]
-    if op in ("media", "cover"):
+    if op in ("pageArt","pageArtStatus"):
+        _,job=illustration_target(p,t)
+        if op=="pageArtStatus":
+            return call("/requests/"+quote(job["id"],safe="")+"/status")
+    if op in ("media", "cover","pageArt"):
         ans = call(
             "/" + p["modelPath"], "POST", p["input"], {"Idempotency-Key": p["id"]}
         )
+        if op == "pageArt":
+            job=t["book"].setdefault("artwork",{}).setdefault(str(p["pageIndex"]),{})
+            job.update(id=str(ans["request_id"]),status="queued",direction=p["artDirection"])
+            t["book"]["artDirection"]=p["artDirection"]
+            persist()
+            return {"status":job["status"]}
         if op == "cover":
             t.update(coverId=str(ans["request_id"]), coverState=ans.get("status", "queued"), coverPrompt=p["coverPrompt"])
             return {"status": t["coverState"]}

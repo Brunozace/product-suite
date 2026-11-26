@@ -168,6 +168,8 @@ const operations = (C) => {
 export const opNames = {
   cover: "Generate ebook cover",
   coverStatus: "Check cover job",
+  pageArt: "Illustrate this page",
+  pageArtStatus: "Check page illustration",
   discover: "Find me an idea",
   batch: "Research public sources",
   book: "Write the product",

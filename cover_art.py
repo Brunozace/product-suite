@@ -14,7 +14,7 @@ def image_tools():
     return Image, ImageOps
 
 
-def save_cover(url, path):
+def save_cover(url, path, *, interior=False):
     require(urlsplit(url).scheme == "https", "Higgsfield returned an invalid image link.")
     Image, ImageOps = image_tools()
     # Only the authenticated job-status response supplies this URL. Never forward API credentials.
@@ -24,7 +24,8 @@ def save_cover(url, path):
         require(len(data) <= 16_000_000, "Cover image is too large.")
         with Image.open(BytesIO(data)) as image:
             require(image.width * image.height <= 32_000_000, "Cover dimensions are too large.")
-            art = ImageOps.fit(ImageOps.exif_transpose(image).convert("RGB"), (1000, 1216))
+            corrected = ImageOps.exif_transpose(image).convert("RGB")
+            art = ImageOps.contain(corrected,(1400,1400)) if interior else ImageOps.fit(corrected,(1000,1216))
             temp = path.with_suffix(".tmp")
             art.save(temp, "JPEG", quality=90)
             temp.replace(path)

@@ -56,6 +56,54 @@ class PrintTests(unittest.TestCase):
         del book["pages"]["2"]
         self.assertFalse(completed(self.track)[4])
 
+    def test_higgsfield_page_illustration_keeps_cover_and_page_content(self):
+        from PIL import Image
+        from providers import quote_job, run_job
+
+        quote_pages(self.p, self.track, {}, {})
+        run_pages(self.p, self.track, {}, {}, lambda: None)
+        book = self.track["book"]
+        self.track["coverId"] = "original-cover"
+        p = dict(
+            track="Ebook",
+            step="build-4",
+            op="pageArt",
+            pageIndex=1,
+            edition=book["signature"],
+            artDirection="Paper collage",
+            id="once",
+        )
+        keys = {"Higgsfield": {"key": "fixture"}}
+        cfg = {"model": "fixture"}
+        with patch("providers.request", return_value={"usd": 0.02}) as request:
+            price, _ = quote_job(p, self.track, cfg, keys)
+            self.assertEqual(price, 0.02)
+            self.assertIn(book["titles"][1], request.call_args.args[4]["prompt"])
+        with patch("providers.request", return_value={"request_id": "page-job"}):
+            run_job(p, self.track, cfg, keys, lambda: None)
+        with self.assertRaisesRegex(ValueError, "existing illustration"):
+            quote_job(p, self.track, cfg, keys)
+        with patch(
+            "providers.request", return_value={"status": "completed"}
+        ) as request:
+            run_job(dict(p, op="pageArtStatus"), self.track, cfg, keys, lambda: None)
+            self.assertIn("/page-job/status", request.call_args.args[2])
+        self.assertEqual(self.track["coverId"], "original-cover")
+        image = BytesIO()
+        Image.new("RGB", (180, 120), "salmon").save(image, "JPEG")
+        plain = pdf_pages(book, only=2)
+        illustrated = pdf_pages(book, only=2, illustrations={"1": image.getvalue()})
+        doc = PdfReader(BytesIO(illustrated))
+        self.assertEqual(len(doc.pages[0].images), 1)
+        self.assertEqual(
+            doc.pages[0].extract_text(),
+            PdfReader(BytesIO(plain)).pages[0].extract_text(),
+        )
+        self.assertEqual(
+            pdf_pages(book, only=3),
+            pdf_pages(book, only=3, illustrations={"1": image.getvalue()}),
+        )
+
     def test_invalid_schema_and_overflow(self):
         for k, v in [
             ("illustration", "missing.jpg"),

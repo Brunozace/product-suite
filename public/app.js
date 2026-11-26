@@ -719,6 +719,8 @@ function capture() {
     modelPath: val("media-model"),
     mediaInput: val("media-input"),
     coverPrompt: val("cover-prompt"),
+    artDirection: val("page-art-direction"),
+    edition: live.tracks[C.t]?.book?.signature,
     mediaPrice: val("media-price"),
     replyId: val("reply-id"),
     checkout: val("checkout-url"),

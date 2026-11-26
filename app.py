@@ -136,6 +136,12 @@ class Workspace:
                 with Image.open(cover) as image:image.verify()
             except (ValueError,OSError,ImportError):
                 review.update(ready=False,coverError="Saved artwork is unavailable. Check the Higgsfield cover job.")
+        for key,job in book.get("artwork",{}).items():
+            file=job.get("file")
+            if file and (not re.fullmatch(r"illustration-[0-9a-f]{64}[.]jpg",file) or not (self.folder/file).is_file()):
+                review["issues"].setdefault(key,[]).append("Check the Higgsfield job to restore the saved illustration.")
+                review["ready"]=False
+        review["illustrations"]+=sum(bool(j.get("file")) for j in book.get("artwork",{}).values())
         return review
 
     def public_track(self, name, track):
@@ -485,6 +491,18 @@ class Workspace:
             if isinstance(result, str)
             else json.dumps(result, indent=2, ensure_ascii=False)
         )
+        if p["op"]=="pageArtStatus":
+            from cover_art import save_cover
+            import hashlib
+            job=track["book"]["artwork"][str(p["pageIndex"])]
+            status=result.get("status","unknown")
+            if status=="completed" and (job.get("savedId")!=job["id"] or not (self.folder/job.get("file","")).is_file()):
+                images=result.get("images") or []
+                require(images,"The provider has not returned an illustration yet. Check this job again.")
+                filename="illustration-"+hashlib.sha256(job["id"].encode()).hexdigest()+".jpg"
+                save_cover(images[0]["url"],self.folder/filename,interior=True)
+                job.update(file=filename,savedId=job["id"])
+            job["status"]=status
         if p["op"] == "coverStatus":
             track["coverState"] = result.get("status", "unknown")
             if track["coverState"] == "completed":
@@ -501,7 +519,7 @@ class Workspace:
             require(isinstance(draft, dict) and all(isinstance(draft.get(k), str) and draft[k].strip()
                     for k in ("subject", "body", "followSubject", "followBody")), "Incomplete email draft. Your saved emails are unchanged.")
             track["mailDraft"] = {**{k: draft[k] for k in ("subject","body","followSubject","followBody")}, "sender": p.get("sender", "")}
-        if p["op"] not in ("discover", "cover", "coverStatus"):
+        if p["op"] not in ("discover", "cover", "coverStatus","pageArt","pageArtStatus"):
             if p["op"] == "write" and p["step"] == "build-5":
                 track.update(voiceReport=output, voiceOriginal=p["original"], voiceApplied=False)
             if p["op"] == "write" and p["step"] == "build-3":
@@ -593,12 +611,19 @@ class Handler(BaseHTTPRequestHandler):
                 cover=ws.folder/"Ebook-cover.jpg"
                 art=cover.read_bytes() if track.get("coverVersion") and cover.is_file() else None
                 if track.get("coverVersion") and not art:raise ValueError("Saved cover image is missing. Check the cover job.")
+                images={}
+                for key,job in book.get("artwork",{}).items():
+                    if match[1]!="final.pdf" and match[1]!=str(int(key)+1)+".png":continue
+                    filename=job.get("file")
+                    if filename:
+                        require(re.fullmatch(r"illustration-[0-9a-f]{64}[.]jpg",filename),"Invalid saved illustration.")
+                        images[key]=(ws.folder/filename).read_bytes()
                 if match[1]=="final.pdf":
                     require(4 not in track.get("staleSteps",[]) and quality(book)["ready"],"Resolve the page review before export.")
-                    return self.response(200,pdf_pages(book,art),"application/pdf")
+                    return self.response(200,pdf_pages(book,art,illustrations=images),"application/pdf")
                 index=int(match[1].split(".")[0])
                 require(index==0 or str(index-1) in book["pages"],"Page has not been generated.")
-                return self.response(200,png(pdf_pages(book,art,only=index)),"image/png")
+                return self.response(200,png(pdf_pages(book,art,only=index,illustrations=images)),"image/png")
             except (ValueError,OSError,KeyError,ImportError) as err:
                 return self.response(400,{"error":str(err)})
         if p.startswith("/covers/"):

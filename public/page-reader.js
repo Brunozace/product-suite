@@ -169,6 +169,7 @@ export function pageReader(t) {
     "</div></div>" +
     row(
       page ? button("Edit page", "edit", key) : "",
+      page ? button("Illustrate page", "show-art") : "",
       number ? button("Regenerate page", "regen", key) : "",
       complete ? b("Download PDF", "livepdfdown") : "",
     ) +
@@ -185,6 +186,28 @@ export function pageReader(t) {
     aside +
     preview +
     "</div>" +
+    (page
+      ? card(
+          "Page illustration · Higgsfield",
+          field(
+            "Illustration style",
+            "page-art-direction",
+            bk.artwork?.[key]?.direction ||
+              bk.artDirection ||
+              (kind.includes("workbook") || kind.includes("activity")
+                ? "Playful cut-paper illustration, warm cream paper, teal and ochre, simple shapes and a quiet background"
+                : "Editorial illustration, warm natural light, restrained colors and a simple background"),
+            "area",
+          ) +
+            row(
+              button("Review illustration estimate", "art", key),
+              bk.artwork?.[key]?.id
+                ? button("Check illustration job", "art-status", key)
+                : "",
+              bk.artwork?.[key]?.status ? badge(bk.artwork[key].status) : "",
+            ),
+        )
+      : "") +
     findings +
     (!complete
       ? card(
@@ -219,6 +242,17 @@ export async function readerAction(
     } else render();
     return;
   }
+  if (a === "press-show-art") {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    document.getElementById("page-art-direction")?.focus();
+    return;
+  }
+  if (a === "press-art" || a === "press-art-status")
+    return liveAction(
+      a === "press-art" ? "pageArt" : "pageArtStatus",
+      "",
+      Number(v),
+    );
   if (a === "press-regen") return liveAction("book", "", Number(v));
   if (a === "press-edit") {
     editing = t.book.pages[v];
