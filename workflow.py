@@ -15,6 +15,11 @@ def completed(track):
              bool(track.get("buyer")), bool(results.get("build-3")),
              bool(book.get("titles")) and len(book.get("units", {})) == len(book["titles"]),
              bool(track.get("voiceReport")), bool(results.get("build-6"))]
+    if "pages" in book:
+        from page_builder import quality
+        flags[4]=quality(book)["ready"]
+    elif book:
+        flags[4]=bool(book.get("titles")) and all(str(book.get("units",{}).get(str(i),"")).strip() for i in range(len(book.get("titles",[]))))
     return [ok and i not in track.get("staleSteps", []) for i, ok in enumerate(flags)]
 
 

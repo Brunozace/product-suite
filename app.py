@@ -33,6 +33,9 @@ from providers import (
 from research import quote_batch, run_batch
 from workflow import changed, completed, prepare
 from discovery import quote_discovery, run_discovery
+from page_builder import quality, quote_pages, run_pages, store_page
+from product_pages import infer
+from page_press import pdf_pages, png
 from live_book import quote_book, run_book
 
 ROOT = Path(__file__).resolve().parent
@@ -120,6 +123,28 @@ class Workspace:
         finally:
             tmp.unlink(missing_ok=True)
 
+    def print_review(self, name, track):
+        book=track.get("book",{})
+        if "pages" not in book:
+            return None
+        review=quality(book)
+        cover=self.folder/(name+"-cover.jpg")
+        if track.get("coverVersion"):
+            try:
+                if not cover.is_file():raise ValueError("Missing cover file")
+                from PIL import Image
+                with Image.open(cover) as image:image.verify()
+            except (ValueError,OSError,ImportError):
+                review.update(ready=False,coverError="Saved artwork is unavailable. Check the Higgsfield cover job.")
+        return review
+
+    def public_track(self, name, track):
+        info={k:v for k,v in track.items() if k!="previousBook"}
+        review=self.print_review(name,track)
+        steps=completed(track)
+        if review and not review["ready"]:steps[4]=False
+        return {**info,"suggestedSubtype":infer(track),"pageQuality":review,"completedSteps":steps}
+
     def status(self):
         keys = {
             n: {
@@ -132,7 +157,7 @@ class Workspace:
         return {
             "keys": keys,
             "config": self.db["config"],
-            "tracks": {name: {**t, "completedSteps": completed(t)} for name, t in self.db["tracks"].items()},
+            "tracks": {name:self.public_track(name,t) for name,t in self.db["tracks"].items()},
             "polling": list(self.polling),
             "reserved": self.reserved,
             "events": self.events[:30],
@@ -234,16 +259,35 @@ class Workspace:
             text = book["units"].get("0", "")
             original = track.get("voiceOriginal", "")
             parts = re.split(r"^##\s+Adapted excerpt\s*$", track.get("voiceReport", ""), maxsplit=1, flags=re.I | re.M)
+            structured=book.get("pages",{}).get("0")
+            if structured:
+                text=next((b["value"] for b in structured["blocks"] if b["type"]=="paragraph"),"")
             require(original and text.startswith(original) and len(parts) == 2 and parts[1].strip()
                     and not track.get("voiceApplied"), "Review a fresh adaptation for the current opening.")
             book.setdefault("originalUnits", {}).setdefault("0", text)
-            book["units"]["0"] = parts[1].strip() + text[len(original):]
+            adapted=parts[1].strip() + text[len(original):]
+            if structured:
+                revised=json.loads(json.dumps(structured))
+                next(b for b in revised["blocks"] if b["type"]=="paragraph")["value"]=adapted
+                store_page(book,"0",revised)
+            else:
+                book["units"]["0"] = adapted
             track["voiceApplied"] = True
             changed(track, 5)
             self.tickets.clear()
             self.persist()
             return {"ok": True}
+        if route == "editpage":
+            book=track.get("book",{});key=str(p.get("unit"))
+            require(p["step"]=="build-4" and key in book.get("pages",{}), "Choose a saved page.")
+            require(p.get("original")==book["pages"][key], "This page changed. Refresh it before editing.")
+            store_page(book,key,p.get("page"))
+            track["staleSteps"]=sorted(set(track.get("staleSteps",[])) | {5,6})
+            self.tickets.clear()
+            self.persist()
+            return {"ok":True}
         if route == "editunit":
+            require("pages" not in track.get("book",{}),"Edit this product in the page reader.")
             book = track.get("book", {})
             key = str(p["unit"])
             require(key in book.get("units", {}), "Choose a built unit.")
@@ -339,6 +383,8 @@ class Workspace:
             )
             if p.get("guided") and p["step"].startswith("build-"):
                 prepare(p, track)
+            if p.get("guided") and "pages" in track.get("book",{}) and (p["step"] in ("build-5","build-6") or p["step"].startswith("launch-")) and p["op"]!="hide":
+                require(self.print_review(p["track"],track)["ready"], "Resolve the printable product review first.")
             if p.get("op") == "campaign":
                 require(p.get("title"), "Enter a campaign product or service name.")
                 require(
@@ -363,6 +409,9 @@ class Workspace:
                 require(posts and handle == track.get("voiceHandle", track.get("notes", {}).get("build-5", "")).lstrip("@").lower(),
                         "Read public posts for this handle before analyzing the voice.")
                 opening = track.get("book", {}).get("units", {}).get("0", "")
+                structured=track.get("book",{}).get("pages",{}).get("0")
+                if structured:
+                    opening=next((b["value"] for b in structured["blocks"] if b["type"]=="paragraph"),"")
                 excerpt = opening[:1600]
                 if len(opening) > len(excerpt):
                     boundary = max(excerpt.rfind("\n\n"), excerpt.rfind(". ") + 1)
@@ -392,7 +441,7 @@ class Workspace:
                                      "Use a neutral greeting. No fictitious recipient details, signature or address. "
                                      "This is a draft for review. The sender footer is appended separately.")
             cost, description = (
-                {"batch": quote_batch, "book": quote_book, "discover": quote_discovery}.get(p["op"], quote_job)
+                {"batch": quote_batch, "book": quote_pages if p.get("subtype") and p["track"]=="Ebook" else quote_book, "discover": quote_discovery}.get(p["op"], quote_job)
             )(p, track, cfg, keys)
             require(
                 self.reserved + cost <= cfg["cap"],
@@ -429,7 +478,7 @@ class Workspace:
             k: v for k, v in self.tickets.items() if v[1]["track"] != p["track"]
         }
         result = (
-            {"batch": run_batch, "book": run_book, "discover": run_discovery}.get(p["op"], run_job)
+            {"batch": run_batch, "book": run_pages if "pageJobs" in p else run_book, "discover": run_discovery}.get(p["op"], run_job)
         )(p, track, cfg, keys, self.persist)
         output = (
             result
@@ -531,6 +580,27 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed():
             return self.response(403, {"error": "Open the local workspace."})
         p = unquote(urlsplit(self.path).path)
+        if p=="/document/Ebook/progress":
+            book=self.server.workspace.db["tracks"].get("Ebook",{}).get("book",{})
+            return self.response(200,{"saved":len(book.get("pages",{})),"total":len(book.get("slots",[]))})
+        if p.startswith("/document/"):
+            match=re.fullmatch(r"/document/Ebook/(final.pdf|[0-9]+[.]png)",p)
+            if not match:return self.response(404,{"error":"Unknown page."})
+            ws=self.server.workspace
+            track=ws.db["tracks"].get("Ebook",{});book=track.get("book",{})
+            if not book.get("pages"):return self.response(404,{"error":"Build the product first."})
+            try:
+                cover=ws.folder/"Ebook-cover.jpg"
+                art=cover.read_bytes() if track.get("coverVersion") and cover.is_file() else None
+                if track.get("coverVersion") and not art:raise ValueError("Saved cover image is missing. Check the cover job.")
+                if match[1]=="final.pdf":
+                    require(4 not in track.get("staleSteps",[]) and quality(book)["ready"],"Resolve the page review before export.")
+                    return self.response(200,pdf_pages(book,art),"application/pdf")
+                index=int(match[1].split(".")[0])
+                require(index==0 or str(index-1) in book["pages"],"Page has not been generated.")
+                return self.response(200,png(pdf_pages(book,art,only=index)),"image/png")
+            except (ValueError,OSError,KeyError,ImportError) as err:
+                return self.response(400,{"error":str(err)})
         if p.startswith("/covers/"):
             track = p.removeprefix("/covers/")
             if track in TRACKS:

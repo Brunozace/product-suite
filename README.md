@@ -12,6 +12,8 @@ python app.py
 
 The launcher opens **http://127.0.0.1:8765** in your browser. If your computer names Python 3 `python3`, use `python3 app.py`. No package installation, Node build, API key or internet connection is needed for Demo. Press Ctrl+C in the terminal to stop the helper. To choose another port, run `python app.py --port 8766`.
 
+For the Live page reader and print export, install the print dependencies once with `python -m pip install -r requirements.txt`. In **Build the ebook**, review the suggested print format and outline before approving a build. Preschool tracing sheets use local vector artwork. Other structured pages use the selected writing model and show a provider estimate. Completed pages survive a failed run. Use **Regenerate page** for one sheet, or **Build manuscript** to resume missing pages. Open **Download PDF** after the page review passes. Existing text manuscripts retain their reader and export, with an option to create a printable edition.
+
 ## Try the demo
 
 1. Open **Build it**, select **Build the ebook**, edit a chapter and download the updated 6 × 9 inch PDF. The ebook includes ten chapters and 24 public source links. The format switch also provides a six-lesson course and a four-week coaching plan.

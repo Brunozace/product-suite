@@ -1,4 +1,5 @@
 import {e, b, badge, card, field, grid, link, row, select, stats, table} from "./ui.js";
+import {pageReader} from "./page-reader.js";
 import {planOutline} from "./planning.js";
 
 const op = (label, name, primary = false) => b(label, "liveop", name, primary ? "primary" : "");
@@ -9,6 +10,8 @@ const rows = (research, name) => research?.[name]?.rows || [];
 const priceField = t => field("One-time price (USD)", "live-price", t.price ?? "", "number");
 const pdf = t => Object.keys(t.book?.units || {}).length ? row(b("Preview PDF","livepdf"), b("Download PDF","livepdfdown")) : "";
 const chapter = new Map();
+let usePrintStudio=false;
+export function upgradeReader(){usePrintStudio=true;}
 export function selectChapter(track, index) { chapter.set(track, index); }
 
 function prose(text = "") {
@@ -41,6 +44,8 @@ function market(t) {
       }).join(""))));
 }
 function reader(C,t) {
+  if(!C.demo && C.t==="Ebook" && (usePrintStudio || t.book?.pages || !Object.keys(t.book?.units || {}).length))
+    return pageReader(t);
   const titles = (!t.staleSteps?.includes(4) && t.book?.titles) || planOutline(t.results?.["build-3"] || "");
   const units = t.staleSteps?.includes(4) ? {} : t.book?.units || {};
   const i = Math.min(chapter.get(C.t) || 0, Math.max(0,titles.length-1));
@@ -56,7 +61,7 @@ function reader(C,t) {
     "<h2>" + e(titles[i] || "Build from your plan") + "</h2>" + (units[i] ? prose(units[i]) + row(b("Edit this unit","editliveunit",i),
       t.book?.originalUnits?.[i]!==undefined?b("Undo edits","undoliveunit",i):"") :
     "<p>Review the outline and source material below, then build the manuscript.</p>") + "</article></div>" +
-    (!t.staleSteps?.includes(4) ? pdf(t) : "") + cover + (t.book?.sources?.length?card("Sources",row(...t.book.sources.map(([name,url],j)=>safe(url)?link("["+ (j+1) +"] "+name,url):e(name)))):"") +
+    (!C.demo && C.t==="Ebook"?b("Create a printable edition","upgradereader"):"")+ (!t.staleSteps?.includes(4) ? pdf(t) : "") + cover + (t.book?.sources?.length?card("Sources",row(...t.book.sources.map(([name,url],j)=>safe(url)?link("["+ (j+1) +"] "+name,url):e(name)))):"") +
     '<details class="card"' + (titles.length ? "" : " open") + '><summary>Outline and source material</summary>' +
     field("Product title","live-title",t.title || "") + field("Outline, one title per line","book-outline",titles.join("\n"),"area") +
     field("Reviewed brief and sources","live-notes",(!t.staleSteps?.includes(4) && t.notes?.["build-4"]) || t.results?.["build-3"] || "","area") + "</details>";

@@ -1,3 +1,4 @@
+import { readerAction } from "./page-reader.js";
 import { demoTrack, pathView, practice, fillExample, launchPage } from "./walkthrough.js";
 import {
   formats,
@@ -42,7 +43,7 @@ import { sources, units } from "./book.js";
 import { productView, chapterText, kit, kitTabs } from "./product.js";
 import { campaignView, replyView } from "./campaign.js";
 import { planningView } from "./planning.js";
-import { studio, selectChapter } from "./studio.js";
+import { studio, selectChapter, upgradeReader } from "./studio.js";
 import { outreachPage, useTemplate } from "./outreach.js";
 import { serviceView, pkg, filesFor } from "./services.js";
 import {
@@ -231,7 +232,7 @@ function rail() {
         .filter(Boolean).length;
   return `<aside class="rail ${railOpen ? "open" : ""}">${b("Close", "rail", "", "quiet railclose")}<span class="eyebrow">Activity</span><div class="spread"><h2>What the app did</h2>${badge(demo ? "Demo" : "Live", "green")}</div><div class="sectionhead"><span class="label">Workspace totals</span></div>${stats(
     [
-      [words.toLocaleString(), "Words written"],
+      [words.toLocaleString(), "Workspace draft words"],
       [
         demo
           ? 18 + data.log.filter((x) => x[0] === "search").length
@@ -691,6 +692,7 @@ function capture() {
   let C = state();
   return {
     guided: true,
+    subtype: val("book-subtype"),
     followSubject: val("follow-subject"),
     followBody: val("follow-body"),
     outline: val("book-outline"),
@@ -722,10 +724,11 @@ function capture() {
     checkout: val("checkout-url"),
   };
 }
-async function liveAction(op, retry = "") {
+async function liveAction(op, retry = "", pageIndex = null) {
   let p = capture();
   const onOriginalStep = () => !demo && state().t === p.track && screen + "-" + idx === p.step;
   p.retry = retry;
+  if(pageIndex!==null)p.pageIndex=pageIndex;
   if (op === "localphoto") {
     let file = document.querySelector("#photo-input")?.files[0];
     if (!file) throw Error("Choose a photo first.");
@@ -779,12 +782,23 @@ async function liveAction(op, retry = "") {
     status.textContent = op === "discover"
       ? "Finding and ranking product ideas. You can browse other steps while this runs."
       : opNames[op] + " is running. You can browse other steps.";
+    const meter=op==="book" && p.subtype ? setInterval(async()=>{
+      try {
+        const r=await fetch("/document/Ebook/progress");const m=await r.json();
+        if(m.total && onOriginalStep())status.textContent=m.saved+" of "+m.total+" pages saved.";
+      } catch {}
+    },900):null;
     try {
-      await api("run", { ticket: q.ticket, confirmed: true });
+      try {
+        await api("run", { ticket: q.ticket, confirmed: true });
+      } catch (error) {
+        await refresh(); if(onOriginalStep()) render(); throw error;
+      }
       await refresh();
       if (onOriginalStep()) render();
       toast(op === "discover" ? "Ideas saved in " + p.track + " → Your idea." : "Result saved.");
     } finally {
+      clearInterval(meter);
       status.textContent = "";
     }
   });
@@ -800,6 +814,12 @@ async function pdf(down, liveBook = false) {
     })),
     sources,
   };
+  if (liveBook && !demo && live.tracks[C.t]?.book?.pages) {
+    if(!live.tracks[C.t].pageQuality?.ready || live.tracks[C.t].staleSteps?.includes(4)) throw Error("Resolve the page review before export.");
+    const a=document.createElement("a");a.href="/document/Ebook/final.pdf";
+    if(down)a.download=slug(live.tracks[C.t].book.title)+".pdf";else a.target="_blank";
+    a.click();return;
+  }
   if (liveBook) {
     let bk = (demo ? demoTrack(C) : live.tracks[C.t]).book;
     body = {
@@ -869,6 +889,9 @@ async function action(a, v, el) {
       t.completedSteps.fill(false,5);
       close(); save(); render(); return;
     }
+  }
+  if (!demo && C.s==="build" && C.i===4 && a.startsWith("press-")) {
+    await readerAction(a,v,live.tracks[C.t] || {},{api,refresh,render,modal,close,liveAction});return;
   }
   switch (a) {
     case "nav":
@@ -1042,6 +1065,7 @@ async function action(a, v, el) {
       }
       render();toast("Opening updated in the manuscript and PDF.");break;
     }
+    case "upgradereader":upgradeReader();render();break;
     case "editliveunit":
       modal(
         "Edit product unit",
