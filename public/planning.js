@@ -1,4 +1,4 @@
-import { e, b, badge, card, grid, link, row, stats } from "./ui.js";
+import { e, b, badge, card, grid, field, link, row, stats } from "./ui.js";
 
 const clean = text => text.replace(/\*\*|__/g, "").trim();
 const cells = line => line.trim().replace(/^\||\|$/g, "").split("|").map(clean);
@@ -28,7 +28,7 @@ export function planOutline(report) {
 }
 export function planningView(C, track) {
   const buyers = C.i === 2;
-  const report = (buyers && track.needsBuyerScores ? "" : track.results?.["build-" + C.i]) || "";
+  const report = ((buyers && track.needsBuyerScores) || (!buyers && track.staleSteps?.includes(3)) ? "" : track.results?.["build-" + C.i]) || "";
   const chosen = track.buyer || "";
   const action = buyers ? "Score buyer groups" : "Create product plan";
   const full = report ? '<details class="card"><summary>Read full saved ' +
@@ -61,6 +61,6 @@ export function planningView(C, track) {
     e(buyers ? "Pick your buyers" : track.title || "Product plan") + "</h1><p>" +
     (buyers ? "Compare the research and choose who you want to build for." : "Review the promise and outline before building your product.") +
     "</p>" + row(b(report ? buyers ? "Score again" : "Regenerate plan" : action, "liveop", "write", report ? "" : "primary"),
-      b(buyers ? "Open product plan" : "Build the " + C.t.toLowerCase(), "next", "", "primary", "arrow")) +
-    '</div><div class="stack">' + audience + body + full + "</div>";
+      (buyers || report) ? b(buyers ? "Open product plan" : "Build the " + C.t.toLowerCase(), "next", "", "primary", "arrow") : "") +
+    '</div><div class="stack">' + audience + body + full + (!buyers && !C.demo ? '<details class="card"><summary>Edit product plan</summary>'+field("Plan and numbered outline","reviewed-plan",report,"area")+b("Save reviewed plan","saveplan")+"</details>" : "") + "</div>";
 }

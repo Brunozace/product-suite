@@ -60,6 +60,20 @@ DEFAULTS = {
 }
 
 
+COVER_FIELDS=("coverId","coverPrompt","coverState","coverVersion","coverIdea")
+
+def current_cover(track):
+    owner=track.get("coverIdea") or track.get("book",{}).get("title")
+    return not owner or owner==track.get("title")
+
+def save_current_plan(track, report):
+    old=track["results"].get("build-3")
+    if old and old!=report and 3 in track.get("staleSteps",[]):
+        history=track.setdefault("previousPlans",[])
+        if old not in history:history.append(old)
+    track["results"]["build-3"]=report
+    track["planBuyer"]=track.get("buyer","")
+
 class Workspace:
     def __init__(self, folder):
         self.folder = folder
@@ -129,7 +143,7 @@ class Workspace:
             return None
         review=quality(book)
         cover=self.folder/(name+"-cover.jpg")
-        if track.get("coverVersion"):
+        if current_cover(track) and track.get("coverVersion"):
             try:
                 if not cover.is_file():raise ValueError("Missing cover file")
                 from PIL import Image
@@ -145,11 +159,23 @@ class Workspace:
         return review
 
     def public_track(self, name, track):
-        info={k:v for k,v in track.items() if k!="previousBook"}
+        info={k:v for k,v in track.items() if k not in ("previousBook","previousPlans","archivedCovers")}
         review=self.print_review(name,track)
         steps=completed(track)
         if review and not review["ready"]:steps[4]=False
-        return {**info,"suggestedSubtype":infer(track),"pageQuality":review,"completedSteps":steps}
+        stale=set(track.get("staleSteps",[]))
+        for field in ("results","notes","research"):
+            info[field]={k:v for k,v in track.get(field,{}).items() if k not in {f"build-{i}" for i in stale}}
+        if 2 in stale:info.pop("buyer",None)
+        if 3 in stale:info.pop("planBuyer",None)
+        if 4 in stale:
+            info.pop("book",None)
+            review=None
+        if 5 in stale:
+            for field in ("voiceOriginal","voiceReport","voiceApplied"):info.pop(field,None)
+        if not current_cover(track):
+            for field in COVER_FIELDS:info.pop(field,None)
+        return {**info,"suggestedSubtype":infer(info),"pageQuality":review,"completedSteps":steps}
 
     def status(self):
         keys = {
@@ -355,7 +381,19 @@ class Workspace:
             self.tickets.clear()
             self.persist()
             return {"ok": True}
+        if route == "saveplan":
+            require(p["step"]=="build-3" and all(completed(track)[:3]),"Choose an idea, research its market and select a buyer first.")
+            require(p.get("buyer")==track.get("buyer") and p.get("title")==track.get("title"),"Refresh the current idea and buyer before saving.")
+            report=str(p.get("report","")).strip()
+            require(report and len(report)<=60000 and re.search(r"^1[.)]\s+.+",report,re.M),"Include a numbered outline in the plan.")
+            save_current_plan(track,report)
+            changed(track,3)
+            self.tickets.clear()
+            self.persist()
+            return {"ok":True}
         if route == "note":
+            if p["step"]=="build-0" and track.get("coverId") and not track.get("coverIdea"):
+                track["coverIdea"]=track.get("book",{}).get("title") or track.get("title")
             if p["step"] == "build-0" and "ideaIndex" in p:
                 ideas = track.get("ideas", [])
                 index = p["ideaIndex"]
@@ -446,9 +484,11 @@ class Workspace:
                 p["instruction"] += (" Return only JSON with four nonempty string fields subject, body, followSubject, followBody. "
                                      "Use a neutral greeting. No fictitious recipient details, signature or address. "
                                      "This is a draft for review. The sender footer is appended separately.")
+            if p["op"]=="coverStatus":
+                require(current_cover(track),"That cover job belongs to an earlier idea.")
             cost, description = (
                 {"batch": quote_batch, "book": quote_pages if p.get("subtype") and p["track"]=="Ebook" else quote_book, "discover": quote_discovery}.get(p["op"], quote_job)
-            )(p, track, cfg, keys)
+            )(p, {k:v for k,v in track.items() if k not in COVER_FIELDS} if p["op"]=="cover" and not current_cover(track) else track, cfg, keys)
             require(
                 self.reserved + cost <= cfg["cap"],
                 "This action would pass your session cap.",
@@ -483,6 +523,18 @@ class Workspace:
         self.tickets = {
             k: v for k, v in self.tickets.items() if v[1]["track"] != p["track"]
         }
+        if track.get("coverId") and not track.get("coverIdea"):
+            track["coverIdea"]=track.get("book",{}).get("title") or track.get("title")
+        if p["op"]=="cover" and not current_cover(track):
+            from hashlib import sha256
+            from shutil import copyfile
+            old={k:track[k] for k in COVER_FIELDS if k in track}
+            path=self.folder/(p["track"]+"-cover.jpg")
+            if path.is_file():
+                name="cover-"+sha256(path.read_bytes()).hexdigest()+".jpg"
+                copyfile(path,self.folder/name);old["file"]=name
+            track.setdefault("archivedCovers",[]).append(old)
+            for field in COVER_FIELDS:track.pop(field,None)
         result = (
             {"batch": run_batch, "book": run_pages if "pageJobs" in p else run_book, "discover": run_discovery}.get(p["op"], run_job)
         )(p, track, cfg, keys, self.persist)
@@ -491,6 +543,7 @@ class Workspace:
             if isinstance(result, str)
             else json.dumps(result, indent=2, ensure_ascii=False)
         )
+        if p["op"]=="cover":track["coverIdea"]=track.get("title")
         if p["op"]=="pageArtStatus":
             from cover_art import save_cover
             import hashlib
@@ -523,7 +576,7 @@ class Workspace:
             if p["op"] == "write" and p["step"] == "build-5":
                 track.update(voiceReport=output, voiceOriginal=p["original"], voiceApplied=False)
             if p["op"] == "write" and p["step"] == "build-3":
-                track["planBuyer"] = track.get("buyer", "")
+                save_current_plan(track,output)
             track["results"][p["step"]] = output[:300000]
             track["notes"][p["step"]] = p.get("notes", "")
             if p.get("title"):
@@ -606,11 +659,12 @@ class Handler(BaseHTTPRequestHandler):
             if not match:return self.response(404,{"error":"Unknown page."})
             ws=self.server.workspace
             track=ws.db["tracks"].get("Ebook",{});book=track.get("book",{})
+            if 4 in track.get("staleSteps",[]):return self.response(409,{"error":"Build from the current product plan first."})
             if not book.get("pages"):return self.response(404,{"error":"Build the product first."})
             try:
                 cover=ws.folder/"Ebook-cover.jpg"
-                art=cover.read_bytes() if track.get("coverVersion") and cover.is_file() else None
-                if track.get("coverVersion") and not art:raise ValueError("Saved cover image is missing. Check the cover job.")
+                art=cover.read_bytes() if current_cover(track) and track.get("coverVersion") and cover.is_file() else None
+                if current_cover(track) and track.get("coverVersion") and not art:raise ValueError("Saved cover image is missing. Check the cover job.")
                 images={}
                 for key,job in book.get("artwork",{}).items():
                     if match[1]!="final.pdf" and match[1]!=str(int(key)+1)+".png":continue

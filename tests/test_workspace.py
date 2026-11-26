@@ -68,6 +68,27 @@ class WorkspaceTests(unittest.TestCase):
         self.ws.dispatch("editunit", {"track": "Ebook", "step": "build-4", "unit": 0, "undo": True})
         self.assertEqual(t["book"]["units"]["0"], "Opening. Rest.")
 
+    def test_switched_idea_uses_current_plan_without_previous_book_or_art(self):
+        t={"title":"Apartment Checklist","buyer":"Renters","notes":{"build-4":"Old brief"},
+           "results":{"build-0":"Apartment Checklist","build-2":"Renters","build-3":"Old school plan"},
+           "research":{"build-1":{"Market":{"rows":[{"title":"Decluttering"}]}}},
+           "book":{"title":"Pencil Practice","subtype":"Educational workbook","titles":["Tracing"],"units":{"0":"Trace"}},
+           "coverId":"old-job","coverVersion":"old-cover","staleSteps":[3,4,5,6]}
+        self.ws.db["tracks"]["Ebook"]=t
+        view=self.ws.status()["tracks"]["Ebook"]
+        self.assertNotIn("book",view)
+        self.assertNotIn("build-3",view["results"])
+        self.assertNotIn("coverVersion",view)
+        self.assertEqual(view["suggestedSubtype"],"Checklist")
+        self.ws.dispatch("saveplan",dict(track="Ebook",step="build-3",title=t["title"],buyer="Renters",report="## Outline\n1. Kitchen inventory"))
+        view=self.ws.status()["tracks"]["Ebook"]
+        self.assertEqual(view["results"]["build-3"],"## Outline\n1. Kitchen inventory")
+        self.assertNotIn("build-4",view["notes"])
+        self.assertTrue(view["completedSteps"][3])
+        self.assertFalse(view["completedSteps"][4])
+        self.assertEqual(t["previousPlans"],["Old school plan"])
+        self.assertEqual(t["book"]["units"]["0"],"Trace")
+
     def test_higgsfield_accepts_full_key_and_legacy_pairs(self):
         for key, secret, credential in (
             ("fixture-key", "", "fixture-key"),

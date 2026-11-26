@@ -30,7 +30,10 @@ function proofImage(index, alt, cls = "") {
   );
 }
 export function pageReader(t) {
-  const bk = t.book || {},
+  if(t.staleSteps?.includes(3) || !t.results?.["build-3"]){
+    return card(t.title || "Your product", "<p>Create a product plan for "+e(t.buyer || "your selected audience")+" to load the outline and source material here.</p>"+b("Open product plan","step","build/3","primary"));
+  }
+  const bk = (t.staleSteps?.includes(4) ? null : t.book) || {},
     generated = bk.pages || {},
     q = t.pageQuality || { missing: [], issues: {} };
   const stale = t.staleSteps?.includes(4);

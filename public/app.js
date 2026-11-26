@@ -1159,6 +1159,9 @@ async function action(a, v, el) {
       render();
       toast(a === "pickcreator" ? "Creator selected for research." : "Offer price saved.");
       break;
+    case "saveplan":
+      await api("saveplan",{track:C.t,step:"build-3",title:live.tracks[C.t].title,buyer:live.tracks[C.t].buyer,report:val("reviewed-plan")});
+      await refresh();render();toast("Product plan saved.");break;
     case "pickbuyer":
       await api("pickbuyer", {track: C.t, step: "build-2", buyer: v, guided: true});
       await refresh();
