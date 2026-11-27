@@ -67,6 +67,15 @@ function reader(C,t) {
     field("Product title","live-title",t.title || "") + field("Outline, one title per line","book-outline",titles.join("\n"),"area") +
     field("Reviewed brief and sources","live-notes",(!t.staleSteps?.includes(4) && t.notes?.["build-4"]) || t.results?.["build-3"] || "","area") + "</details>";
 }
+function listedEmails(profile) {
+  const emails = [profile.businessEmail, profile.publicEmail, profile.biography]
+    .flatMap(value => String(value || "").match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi) || []);
+  return [...new Set(emails.map(email => email.toLowerCase()))];
+}
+function linkedinProfile(url) {
+  const match = String(url || "").match(/^https:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/in\/([\w%.-]+)\/?(?:[?#].*)?$/i);
+  return match ? "https://www.linkedin.com/in/" + match[1] : "";
+}
 function creatorSearch(t) {
   const research=t.research?.["outreach-0"] || {};
   const profiles=rows(research,"Creators"), reels=[...rows(research,"Topic reels"),...rows(research,"Recent work")];
@@ -76,7 +85,7 @@ function creatorSearch(t) {
     const views=posts.map(r=>r.videoPlayCount ?? r.videoViewCount).filter(v=>v!=null && Number.isFinite(Number(v))).map(Number);
     const best=views.length ? Math.max(...views) : null;
     const count=p.followersCount, bio=p.biography || "";
-    const email=bio.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i)?.[0] || p.businessEmail;
+    const email=listedEmails(p).join(", ");
     const size=count==null ? null : count>=10000 && count<=100000;
     const checks=[size,best==null?null:best>=5000,Boolean(email)];
     return {p,best,email,size,guide:/\b(?:ebook|workbook|guide|course)\b/i.test(bio),score:checks.filter(Boolean).length};
@@ -111,17 +120,42 @@ function voice(t) {
       card("Adapted excerpt",parts[1]?prose(parts[1])+row(b("Copy adapted excerpt","copy",parts[1].trim()),t.voiceApplied?badge("Applied to manuscript","green"):b("Apply to manuscript","applyvoice")):"<p>The analysis will add a side-by-side sample here.</p>")]);
 }
 function contacts(t) {
-  const checks=Object.values(t.checks || {});
-  const selected=rows(t.research?.["outreach-0"],"Creators").find(p=>p.username===t.creator) || t.creatorProfile;
-  const profiles=selected ? [selected] : [];
-  const hits=rows(t.research?.["outreach-0"],"Public profiles");
-  const urls=hits.map(source).filter(u=>/^https:\/\/(?:[a-z]+\.)?linkedin\.com\/in\//i.test(u));
-  return stats([[checks.length,"Profiles checked"],[checks.filter(x=>x.verified?.length).length,"Verified"],[checks.filter(x=>!x.verified?.length).length,"Skipped"]]) +
-    card("Lead review",table(["Source","Address","Status"],[
-      ...profiles.map(p=>[e("@"+p.username),e(p.businessEmail || p.biography?.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i)?.[0] || "Unlisted"),"Profile review"]),
-      ...checks.map(c=>[safe(c.source)?link("Profile",c.source):"Profile",e(c.verified?.join(", ") || "—"),e(c.result)])])) +
-    card("Verify business emails with Apify",field("Public LinkedIn profile URLs","lookup",urls.join("\n"),"area")+
-      "<p>Use the matching LinkedIn profile for each creator. The lookup saves confirmed business addresses for your campaign.</p>");
+  const research = t.research?.["outreach-0"];
+  const checks = Object.values(t.checks || {});
+  const verified = new Set(checks.flatMap(check => check.verified || []).map(email => email.toLowerCase()));
+  const checkedProfiles = new Map(checks.filter(c => linkedinProfile(c.source)).map(c => [linkedinProfile(c.source), c]));
+  const profiles = rows(research, "Creators");
+  const current = !research && t.creatorProfile ? [t.creatorProfile] : profiles;
+  const listed = new Set();
+  const leads = [];
+  const candidates = new Map();
+  for (const profile of current) {
+    const emails = listedEmails(profile);
+    emails.forEach(email => listed.add(email));
+    const name = profile.username ? "@" + profile.username : "Creator";
+    leads.push([e(name), e(emails.join(", ") || "—"), emails.length
+      ? emails.every(email => verified.has(email)) ? "Verified" : "Listed on profile"
+      : "No email listed"]);
+    const url = linkedinProfile(profile.linkedinUrl) || linkedinProfile(profile.externalUrl);
+    if (url) candidates.set(url, name);
+  }
+  for (const hit of rows(research, "Public profiles")) {
+    const url = linkedinProfile(source(hit));
+    if (url) candidates.set(url, hit.title || "LinkedIn profile");
+  }
+  const pending = [...candidates.keys()].filter(url => !checkedProfiles.has(url));
+  for (const url of pending) leads.push([link(candidates.get(url), url), "—", "Available for lookup"]);
+  for (const check of checks) {
+    leads.push([safe(check.source) ? link("Checked profile", check.source) : "Email check",
+      e(check.verified?.join(", ") || "—"), e(check.result)]);
+  }
+  return stats([[listed.size,"Listed emails"],[verified.size,"Verified emails"],[pending.length,"Profiles ready for lookup"]]) +
+    card("Lead review", leads.length ? table(["Source","Address","Status"], leads) :
+      "<p>Search for creators to bring their public business emails and LinkedIn profiles here automatically.</p>" + go("Find creators","outreach/0")) +
+    '<details class="card"' + (pending.length ? " open" : "") + '><summary>Verify business emails with Apify</summary>' +
+    field("Public LinkedIn profile URLs","lookup",pending.slice(0,25).join("\n"),"area") +
+    "<p>Matching profiles from creator search are filled in automatically. You can also add a profile. Review the lookup cost before running it.</p>" +
+    op("Check business emails","verify") + "</details>";
 }
 export function studio(C,t) {
   const id=C.s+"-"+C.i;
@@ -145,5 +179,5 @@ export function studio(C,t) {
     op("Run custom research","robot")+
     (t.results?.[id]?.trimStart().startsWith("[")?'<pre>'+e(t.results[id])+'</pre>':"")+"</details>" : "";
   return '<div class="stepshead studio-head"><span class="eyebrow">'+e(C.s==="build"?"Build it":"Find buyers & send")+" · Step "+(C.i+1)+
-    "</span><h1>"+e(heading)+"</h1>"+row(op(label,action,true),b("Next step","next","","","arrow"))+'</div><div class="stack">'+view(C,t)+advanced+"</div>";
+    "</span><h1>"+e(heading)+"</h1>"+row(id==="outreach-1" ? "" : op(label,action,true),b("Next step","next","",id==="outreach-1" ? "primary" : "","arrow"))+'</div><div class="stack">'+view(C,t)+advanced+"</div>";
 }
