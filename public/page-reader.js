@@ -1,4 +1,5 @@
 import { b, badge, card, e, field, row, select, stats, val } from "./ui.js";
+import { live } from "./live.js";
 import { planOutline } from "./planning.js";
 
 const types = [
@@ -56,6 +57,7 @@ export function pageReader(t) {
   const setup = card(
     "Print format",
     select("book-subtype", types, kind) +
+      (live.keys.Higgsfield?.mask ? "<p>Higgsfield illustrates the cover and every interior page during the build. The estimate includes writing and artwork.</p>" : "") +
       "<details><summary>Reviewed plan and source material</summary>" +
       field("Title", "live-title", t.title || "") +
       field("Outline, one section per line", "book-outline", outline, "area") +

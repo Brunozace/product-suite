@@ -547,9 +547,20 @@ class Workspace:
                 copyfile(path,self.folder/name);old["file"]=name
             track.setdefault("archivedCovers",[]).append(old)
             for field in COVER_FIELDS:track.pop(field,None)
-        result = (
-            {"batch": run_batch, "book": run_pages if "pageJobs" in p else run_book, "discover": run_discovery}.get(p["op"], run_job)
-        )(p, track, cfg, keys, self.persist)
+        try:
+            result = (
+                {"batch": run_batch, "book": run_pages if "pageJobs" in p else run_book, "discover": run_discovery}.get(p["op"], run_job)
+            )(p, track, cfg, keys, self.persist)
+            if "artJobs" in p:
+                from book_art import build_art
+                build_art(p["artJobs"],track["book"],keys,self.folder,self.persist)
+                track["book"]["autoArtPending"]=False
+                self.persist()
+        finally:
+            if "artJobs" in p:
+                # Jobs never submitted cannot incur a provider charge.
+                unused=sum(task["price"] for task in p["artJobs"] if not task.get("attempted"))
+                self.reserved=round(max(0,self.reserved-unused),4)
         output = (
             result
             if isinstance(result, str)
@@ -672,7 +683,7 @@ class Handler(BaseHTTPRequestHandler):
         p = unquote(urlsplit(self.path).path)
         if p=="/document/Ebook/progress":
             book=self.server.workspace.db["tracks"].get("Ebook",{}).get("book",{})
-            return self.response(200,{"saved":len(book.get("pages",{})),"total":len(book.get("slots",[]))})
+            return self.response(200,{"saved":len(book.get("pages",{})),"total":len(book.get("slots",[])), "artPending":book.get("autoArtPending",False),"interiors":sum(bool(j.get("file")) for j in book.get("artwork",{}).values())})
         if p.startswith("/document/"):
             match=re.fullmatch(r"/document/Ebook/(final.pdf|[0-9]+[.]png)",p)
             if not match:return self.response(404,{"error":"Unknown page."})
@@ -684,6 +695,10 @@ class Handler(BaseHTTPRequestHandler):
                 cover=ws.folder/"Ebook-cover.jpg"
                 art=cover.read_bytes() if current_cover(track) and track.get("coverVersion") and cover.is_file() else None
                 if current_cover(track) and track.get("coverVersion") and not art:raise ValueError("Saved cover image is missing. Check the cover job.")
+                if not art and book.get("frontArt",{}).get("file"):
+                    filename=book["frontArt"]["file"]
+                    require(re.fullmatch(r"illustration-[0-9a-f]{64}[.]jpg",filename),"Invalid saved cover.")
+                    art=(ws.folder/filename).read_bytes()
                 images={}
                 for key,job in book.get("artwork",{}).items():
                     if match[1]!="final.pdf" and match[1]!=str(int(key)+1)+".png":continue

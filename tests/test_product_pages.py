@@ -104,6 +104,59 @@ class PrintTests(unittest.TestCase):
             pdf_pages(book, only=3, illustrations={"1": image.getvalue()}),
         )
 
+    def test_illustrated_build_quotes_once_and_resumes_pending_images(self):
+        from PIL import Image
+
+        payload = dict(self.p, autoArt=True, outline="First trail\nUpper curves")
+        calls = []
+        fail_once = [True]
+
+        def provider(keys, name, path, method="GET", body=None, extra=None):
+            if "/estimate/" in path:
+                return {"usd": 0.1}
+            if method == "POST":
+                calls.append(extra["Idempotency-Key"])
+                return {"request_id": str(len(calls))}
+            if path == "/requests/2/status" and fail_once:
+                fail_once.pop()
+                raise ValueError("temporary")
+            return {
+                "status": "completed",
+                "images": [{"url": "https://fixture.invalid/image"}],
+            }
+
+        def save(url, path, interior):
+            Image.new("RGB", (90, 60), "teal").save(path)
+
+        with (
+            tempfile.TemporaryDirectory() as folder,
+            patch("book_art.request", side_effect=provider),
+            patch("book_art.save_cover", side_effect=save),
+        ):
+            w = Workspace(Path(folder))
+            w.db["keys"]["Higgsfield"] = {"key": "fixture", "status": "Connected"}
+            q = w.dispatch("quote", dict(payload))
+            self.assertIn("0.3000", q["price"])
+            self.assertFalse(calls)
+            with self.assertRaisesRegex(ValueError, "Resume"):
+                w.dispatch("run", dict(ticket=q["ticket"], confirmed=True))
+            book = w.db["tracks"]["Ebook"]["book"]
+            self.assertEqual(len(book["pages"]), 2)
+            self.assertFalse(quality(book)["ready"])
+            self.assertAlmostEqual(w.reserved, 0.2)
+            w = Workspace(Path(folder))
+            q = w.dispatch("quote", dict(payload))
+            self.assertIn("0.1000", q["price"])
+            w.dispatch("run", dict(ticket=q["ticket"], confirmed=True))
+            book = w.db["tracks"]["Ebook"]["book"]
+            self.assertEqual(len(calls), 3)
+            self.assertTrue(quality(book)["ready"])
+            self.assertTrue((Path(folder) / book["frontArt"]["file"]).is_file())
+            for i in range(2):
+                self.assertTrue(
+                    (Path(folder) / book["artwork"][str(i)]["file"]).is_file()
+                )
+
     def test_invalid_schema_and_overflow(self):
         for k, v in [
             ("illustration", "missing.jpg"),

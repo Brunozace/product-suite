@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 import json
+from decimal import Decimal, ROUND_UP
 
 from product_pages import (
     TYPES,
@@ -79,6 +80,7 @@ def quality(book):
             )
         if errors:
             issues[key] = errors
+    art_pending = book.get("autoArtPending", False)
     return {
         "missing": missing,
         "issues": issues,
@@ -87,7 +89,8 @@ def quality(book):
         "ready": bool(book["slots"])
         and not missing
         and not issues
-        and not book.get("failures"),
+        and not book.get("failures")
+        and not art_pending,
     }
 
 
@@ -165,8 +168,23 @@ def quote_pages(p, t, cfg, keys):
             bound, _ = quote_job(job, t, cfg, keys)
             cost += bound
         jobs.append(job)
+    art = []
+    if target is None and (
+        keys.get("Higgsfield", {}).get("key") or (same and book.get("autoArtPending"))
+    ):
+        from book_art import plan_art
+
+        art = plan_art(p, t, book if same else {}, plan, keys)
+        p["artJobs"] = art
+    art_cost = sum(task["price"] for task in art)
+    total = Decimal(str(round(cost, 4))) + sum(
+        Decimal(str(task["price"])) for task in art
+    )
     require(
-        jobs or (same and 4 in t.get("staleSteps", [])),
+        jobs
+        or art
+        or (same and book.get("autoArtPending") and "artJobs" in p)
+        or (same and 4 in t.get("staleSteps", [])),
         "All pages are saved. Choose a page to edit or regenerate.",
     )
     p.update(pageJobs=jobs, slots=plan, signature=signature, localPages=pencil)
@@ -174,8 +192,13 @@ def quote_pages(p, t, cfg, keys):
         "using local vector exercises" if pencil else "with the selected writing model"
     )
     return (
-        round(cost, 4),
-        f"Build {len(jobs)} of {len(plan)} printable pages {engine}. Each page is checked and saved separately.",
+        float(total.quantize(Decimal("0.0001"), rounding=ROUND_UP)),
+        f"Build {len(jobs)} of {len(plan)} printable pages {engine}. Each page is checked and saved separately."
+        + (
+            f"\n\nHiggsfield: ${art_cost:.4f} for {sum(not task['id'] for task in art)} new images. Existing jobs are collected automatically. Includes artwork throughout all {len(plan)} interior pages."
+            if art
+            else ""
+        ),
     )
 
 
@@ -207,6 +230,9 @@ def run_pages(p, t, cfg, keys, persist):
             "sources": [],
         }
     book = t["book"]
+    if p.get("artJobs"):
+        book["autoArtPending"] = True
+        persist()
     t["staleSteps"] = sorted((set(t.get("staleSteps", [])) - {4}) | {5, 6})
     for job in p["pageJobs"]:
         key = job["index"]

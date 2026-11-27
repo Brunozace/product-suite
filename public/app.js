@@ -788,7 +788,7 @@ async function liveAction(op, retry = "", pageIndex = null) {
     const meter=op==="book" && p.subtype ? setInterval(async()=>{
       try {
         const r=await fetch("/document/Ebook/progress");const m=await r.json();
-        if(m.total && onOriginalStep())status.textContent=m.saved+" of "+m.total+" pages saved.";
+        if(m.total && onOriginalStep())status.textContent=m.saved+" of "+m.total+" pages saved."+(m.artPending?" Higgsfield illustrations: "+m.interiors+" / "+m.total+".":"");
       } catch {}
     },900):null;
     try {
