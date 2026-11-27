@@ -166,7 +166,12 @@ class Workspace:
         stale=set(track.get("staleSteps",[]))
         for field in ("results","notes","research"):
             info[field]={k:v for k,v in track.get(field,{}).items() if k not in {f"build-{i}" for i in stale}}
-        if 2 in stale:info.pop("buyer",None)
+        if 2 in stale:
+            info.pop("buyer",None)
+            if track.get("needsBuyerScores") is False and track.get("results",{}).get("build-2"):
+                info["results"]["build-2"]=track["results"]["build-2"]
+        if 5 in stale and track.get("voiceResearchCurrent"):
+            info["research"]["build-5"]=track.get("research",{}).get("build-5",{})
         if 3 in stale:info.pop("planBuyer",None)
         if 4 in stale:
             info.pop("book",None)
@@ -195,6 +200,12 @@ class Workspace:
             "events": self.events[:30],
             "runs": self.runs,
         }
+
+    def check_budget(self,cost,cfg):
+        available=round(max(0,cfg["cap"]-self.reserved),8)
+        require(cost<=available,
+                f"Dearwork session cap: ${available:.4f} available of ${cfg['cap']:.2f}; "
+                f"${self.reserved:.4f} already reserved. This action needs ${cost:.4f}. Review the session limit in Settings.")
 
     def dispatch(self, route, p):
         keys, cfg = self.db["keys"], self.db["config"]
@@ -364,6 +375,8 @@ class Workspace:
             if track.get("voiceHandle") and track["voiceHandle"].lower() != p["creator"].lower():
                 track["staleSteps"] = sorted(set(track.get("staleSteps", [])) | {5, 6})
                 self.tickets.clear()
+            if track.get("creator") != p["creator"]:
+                track["voiceResearchCurrent"]=False
             track["creator"] = p["creator"]
             track["creatorProfile"] = next(r for r in profiles if r.get("username") == p["creator"])
             self.persist()
@@ -486,13 +499,15 @@ class Workspace:
                                      "This is a draft for review. The sender footer is appended separately.")
             if p["op"]=="coverStatus":
                 require(current_cover(track),"That cover job belongs to an earlier idea.")
-            cost, description = (
-                {"batch": quote_batch, "book": quote_pages if p.get("subtype") and p["track"]=="Ebook" else quote_book, "discover": quote_discovery}.get(p["op"], quote_job)
-            )(p, {k:v for k,v in track.items() if k not in COVER_FIELDS} if p["op"]=="cover" and not current_cover(track) else track, cfg, keys)
-            require(
-                self.reserved + cost <= cfg["cap"],
-                "This action would pass your session cap.",
-            )
+            remaining=round(max(0,cfg["cap"]-self.reserved), 8)
+            if p["op"]=="batch":
+                cost,description=quote_batch(p,track,cfg,keys,remaining=remaining)
+            else:
+                estimate={"book":quote_pages if p.get("subtype") and p["track"]=="Ebook" else quote_book,
+                          "discover":quote_discovery}.get(p["op"],quote_job)
+                context={k:v for k,v in track.items() if k not in COVER_FIELDS} if p["op"]=="cover" and not current_cover(track) else track
+                cost,description=estimate(p,context,cfg,keys)
+            self.check_budget(cost,cfg)
             self.tickets = {
                 k: v
                 for k, v in self.tickets.items()
@@ -511,10 +526,7 @@ class Workspace:
             }
         require(route == "run", "Unknown local action.")
         cost = p["cost"]
-        require(
-            self.reserved + cost <= cfg["cap"],
-            "This action would pass your session cap.",
-        )
+        self.check_budget(cost,cfg)
         if p["op"] == "robot":
             require(cost <= cfg["robotCap"], "The run exceeds your robot cap.")
         # Keep the full reservation on ambiguous failures and consume each ticket once.
@@ -592,18 +604,25 @@ class Workspace:
             if (index in (3, 5, 6) and p["op"] == "write") or (index == 4 and p["op"] == "book"):
                 changed(track, index)
             if index == 5 and p["op"] == "batch":
+                track["voiceResearchCurrent"]=True
                 track["staleSteps"] = sorted(set(track.get("staleSteps", [])) | {5, 6})
+        message = ""
+        if p["op"]=="batch":
+            failed=sum(row.get("status")=="Failed" for row in result.values())
+            if failed:
+                message=f"{failed} of {len(result)} research sources failed. Review the source errors and retry individually where available."
+        event_title="Research needs review" if message else p["op"].capitalize()+" complete"
         self.events.insert(
             0,
             [
                 "check",
-                p["op"].capitalize() + " complete",
+                event_title,
                 p["track"],
                 time.strftime("%H:%M"),
             ],
         )
         self.persist()
-        return {"ok": True}
+        return {"ok": True, **({"message":message} if message else {})}
 
 
 class LocalServer(ThreadingHTTPServer):

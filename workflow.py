@@ -25,6 +25,8 @@ def completed(track):
 
 def changed(track, index):
     stale = set(track.get("staleSteps", []))
+    if index < 5:
+        track["voiceResearchCurrent"]=False
     stale.discard(index)
     stale.update(range(index + 1, len(LABELS)))
     track["staleSteps"] = sorted(stale)

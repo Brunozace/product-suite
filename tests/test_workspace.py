@@ -192,6 +192,35 @@ class WorkspaceTests(unittest.TestCase):
         ):
             self.quote("robot", **p)
 
+    def test_market_batch_fits_remaining_session_budget(self):
+        self.key("Apify")
+        self.ws.reserved=5.0493
+        with patch("providers.actor_pricing",return_value={}):
+            q=self.quote("batch",step="build-1")
+        payload=self.ws.tickets[q["ticket"]][1]
+        self.assertEqual(payload["cost"],4.95)
+        self.assertEqual([j["cost"] for j in payload["jobs"]],[.99]*5)
+        self.assertIn("normally $1.00",q["description"])
+        self.assertEqual(self.ws.reserved,5.0493)
+        self.assertEqual(self.ws.db["config"]["robotCap"],1)
+        with patch("providers.actor_pricing",return_value={}):
+            reduced=self.quote("batch",step="build-1",batchLimit="1.00")
+        self.assertEqual(self.ws.tickets[reduced["ticket"]][1]["cost"],1)
+        self.ws.reserved=9.99
+        with self.assertRaisesRegex(ValueError,"at least"):
+            self.quote("batch",step="build-1")
+        with self.assertRaisesRegex(ValueError,"session cap"):
+            self.execute(reduced)
+
+    def test_new_buyer_scores_visible_before_audience_selection(self):
+        track={"staleSteps":[2,3,4,5,6],"needsBuyerScores":False,"results":{"build-2":"Current scored groups"},"buyer":"Previous buyer"}
+        current=self.ws.public_track("Ebook",track)
+        self.assertEqual(current["results"]["build-2"],"Current scored groups")
+        self.assertNotIn("buyer",current)
+        self.assertFalse(current["completedSteps"][2])
+        track["needsBuyerScores"]=True
+        self.assertNotIn("build-2",self.ws.public_track("Ebook",track)["results"])
+
     def test_no_unknown_robot_billing(self):
         self.key("Apify")
         with (

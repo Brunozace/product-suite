@@ -217,7 +217,7 @@ function nav() {
           "</div>"
         : ""
     }`;
-  return `<aside class="nav ${navOpen ? "open" : ""}"><div class="brand"><img src="/mark.svg" alt=""><div><strong>Dearwork</strong><small>Make it, sell it, get clients</small></div>${b("×", "menu", "", "mobile quiet")}</div><div class="navscroll">${navTop("home", "Home", "home")}${navTop("unibox", "Unibox", "mail", demo ? '<span class="count">' + unread + "</span>" : "")}${navTop("settings", "Settings", "settings")}<span class="label">Digital product</span><div class="pick">${icon("book")}${select("format", formats, C.f)}</div>${groups.slice(0, 3).map(group).join("")}<span class="label">AI side hustles</span><div class="pick">${icon("layers")}${select("hustle", hustles, C.h)}</div>${groups.slice(3).map(group).join("")}</div><div class="navfoot"><div class="seg">${b("Demo", "mode", "demo", demo ? "sel" : "")}${b("Live", "mode", "live", !demo ? "sel" : "")}</div>${demo ? b("Run live demo", "tour", "", "money", "play") + '<div class="footlinks">' + b("Load finished example", "loadall", "", "quiet", "layers") + b("Saved", "saved", "", "quiet", "folder") + "</div>" : ""}<div class="costline"><span>${demo ? "Demo, nothing spent" : "Session budget reserved"}</span><b class="mono">$${demo ? "0.00" : Number(live.reserved || 0).toFixed(2)}</b></div></div></aside>`;
+  return `<aside class="nav ${navOpen ? "open" : ""}"><div class="brand"><img src="/mark.svg" alt=""><div><strong>Dearwork</strong><small>Make it, sell it, get clients</small></div>${b("×", "menu", "", "mobile quiet")}</div><div class="navscroll">${navTop("home", "Home", "home")}${navTop("unibox", "Unibox", "mail", demo ? '<span class="count">' + unread + "</span>" : "")}${navTop("settings", "Settings", "settings")}<span class="label">Digital product</span><div class="pick">${icon("book")}${select("format", formats, C.f)}</div>${groups.slice(0, 3).map(group).join("")}<span class="label">AI side hustles</span><div class="pick">${icon("layers")}${select("hustle", hustles, C.h)}</div>${groups.slice(3).map(group).join("")}</div><div class="navfoot"><div class="seg">${b("Demo", "mode", "demo", demo ? "sel" : "")}${b("Live", "mode", "live", !demo ? "sel" : "")}</div>${demo ? b("Run live demo", "tour", "", "money", "play") + '<div class="footlinks">' + b("Load finished example", "loadall", "", "quiet", "layers") + b("Saved", "saved", "", "quiet", "folder") + "</div>" : ""}<div class="costline"><span>${demo ? "Demo, nothing spent" : "Session budget reserved"}</span><b class="mono">$${demo ? "0.00" : Number(live.reserved || 0).toFixed(2)}${demo ? "" : " / $" + Number(live.config.cap).toFixed(2)}</b></div></div></aside>`;
 }
 function rail() {
   let events = demo
@@ -707,6 +707,7 @@ function capture() {
       (specs[screen + "-" + idx] || ""),
     title: val("live-title"),
     notes: val("live-notes"),
+    batchLimit: val("batch-limit"),
     actor: val("actor"),
     actorInput: val("actor-input"),
     lookup: val("lookup"),
@@ -792,13 +793,14 @@ async function liveAction(op, retry = "", pageIndex = null) {
     },900):null;
     try {
       try {
-        await api("run", { ticket: q.ticket, confirmed: true });
+        const result=await api("run", { ticket: q.ticket, confirmed: true });
+        if(result.message) q.resultMessage=result.message;
       } catch (error) {
         await refresh(); if(onOriginalStep()) render(); throw error;
       }
       await refresh();
       if (onOriginalStep()) render();
-      toast(op === "discover" ? "Ideas saved in " + p.track + " → Your idea." : "Result saved.");
+      toast(q.resultMessage || (op === "discover" ? "Ideas saved in " + p.track + " → Your idea." : "Result saved."));
     } finally {
       clearInterval(meter);
       status.textContent = "";

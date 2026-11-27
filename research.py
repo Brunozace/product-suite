@@ -1,9 +1,10 @@
 """Quoted batches of public research with each actor bounded independently."""
 
+from decimal import Decimal, ROUND_DOWN
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json, re
 from urllib.parse import quote_plus
-from providers import quote_job, run_job, require
+from providers import amount, quote_job, run_job, require
 
 
 def make_jobs(p, t):
@@ -155,7 +156,7 @@ def make_jobs(p, t):
     return jobs
 
 
-def quote_batch(p, t, cfg, keys):
+def quote_batch(p, t, cfg, keys, *, remaining=None):
     require(
         keys.get("Apify", {}).get("key"), "Add your Apify key first. It opens below."
     )
@@ -164,6 +165,20 @@ def quote_batch(p, t, cfg, keys):
     if retry and not p["step"] == "outreach-0":
         batch = [j for j in batch if j[0] == retry]
         require(batch, "This research row no longer exists.")
+    budget_note = ""
+    if remaining is not None:
+        available = Decimal(str(remaining))
+        if p.get("batchLimit") not in (None,""):
+            limit=Decimal(str(amount(p["batchLimit"],0.01)))
+            require(limit >= len(batch)*Decimal("0.01"), f"Enter a batch maximum of at least ${len(batch)*0.01:.2f} for {len(batch)} actors.")
+            available=min(available,limit)
+        ceiling = Decimal(str(cfg["robotCap"]))
+        if ceiling * len(batch) > available:
+            per_actor = (available / len(batch)).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+            require(per_actor >= Decimal("0.01"),
+                    f"Dearwork session cap: ${available:.4f} available. This scan needs at least ${len(batch)*0.01:.2f} across {len(batch)} actors. Review the session limit in Settings.")
+            cfg = {**cfg, "robotCap": float(per_actor)}
+            budget_note = f"Adjusted to fit the available research budget: {len(batch)} actors at up to ${per_actor:.2f} each (normally ${ceiling:.2f}).\n\n"
     planned = []
     details = []
     total = 0.0
@@ -184,7 +199,7 @@ def quote_batch(p, t, cfg, keys):
             + json.dumps(payload, ensure_ascii=False)
         )
     p["jobs"] = planned
-    return round(total, 4), "Research jobs for " + p["track"] + "\n\n" + "\n\n".join(
+    return round(total, 4), budget_note + "Research jobs for " + p["track"] + "\n\n" + "\n\n".join(
         details
     )
 

@@ -479,6 +479,8 @@ def quote_job(p, t, cfg, keys):
         )[op]
     else:
         desc += "Read account records. Only names, identifiers and status are returned."
+    if op == "robot":
+        return cost, desc
     return math.ceil(cost * 10000) / 10000, desc
 
 

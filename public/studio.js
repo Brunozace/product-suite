@@ -32,6 +32,7 @@ function market(t) {
   const research=t.research?.["build-1"] || {};
   const report=t.results?.["build-1"] || "";
   return card("Research question",field("Product or audience","live-notes",(t.staleSteps?.includes(1) ? "" : t.notes?.["build-1"]) || t.title || t.notes?.["build-0"] || "")+
+    field("Maximum for this research batch in USD (optional)","batch-limit","","number")+
     op("Summarize market evidence","write")) +
     (report && !report.trimStart().startsWith("{") ? card("Market findings",prose(report)) : "") +
     grid(Object.entries(research).map(([name,r])=>card(name,

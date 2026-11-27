@@ -22,7 +22,7 @@ export async function refresh() {
   live = await api("status");
 }
 export const configFields = {
-  cap: "Session spending cap ($)",
+  cap: "Dearwork session spending cap ($)",
   robotCap: "Cap per robot run ($)",
   fable: "Fable / Hermes loopback address",
   company: "Whop account ID",
@@ -130,7 +130,7 @@ export function settingsView(C) {
     ) +
     card(
       "Research robots",
-      "<p>Live runs use the current pricing model returned by Apify. Enter the pay-per-event actor and input on the research step. The helper reserves the full run cap.</p>",
+      "<p>Live runs use the current pricing model returned by Apify. Enter the pay-per-event actor and input on the research step. Dearwork reserves the quoted maximum for each approved run. Research batches reduce their per-actor limits to fit the remaining session budget. Your Apify credit balance is managed separately.</p>",
     ) +
     card("Demo workspace", b("Reset the demo", "resetdemo"))
   );
